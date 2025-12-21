@@ -164,43 +164,27 @@ class GameEngine:
 
     def construct_prompt(self, event_type, event_data, extra_context=""):
         p = self.player
-        profile = p.profile
         
-        prompt = f"""
-角色：{p.name} ({p.save_data.get('race', '人类')} Lv{p.game_stats['等级']})
-性格：{p.psychology}
-语言风格：{p.language_style}
-当前状态：HP={p.game_stats['HP']}, 基因特质={','.join(p.get_traits())}
+        prompt = f"""角色：{p.name} (Lv{p.game_stats['等级']} {p.save_data.get('race', '人类')})
+特质：{','.join(p.get_traits()) if p.get_traits() else '无'}
 事件：[{event_type}] {event_data}
-{extra_context}
+HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
 
-请以第一人称生成一段简短的日记/独白（50字以内），描述该事件。
-要求：符合角色性格，体现当前状态（如受伤会痛苦），如果发生了战斗请描述战斗细节。
+请以第一人称写一句简短反应（30字以内），符合角色语言风格。不要编造不存在的信息。
 """
         return prompt
 
     def ai_generate_child_personality(self, p1_name, p1_personality, p1_style, 
                                        p2_name, p2_personality, p2_style, child_gender):
         """使用AI融合父母性格生成子嗣性格"""
-        prompt = f"""根据父母的性格特点，生成他们孩子的性格和说话风格。
+        prompt = f"""根据父母特点生成孩子性格。
 
-父亲/母亲1: {p1_name}
-性格: {p1_personality}
-说话风格: {p1_style}
-
-父亲/母亲2: {p2_name}  
-性格: {p2_personality}
-说话风格: {p2_style}
-
+父/母1: {p1_name}
+父/母2: {p2_name}
 孩子性别: {child_gender}
 
-请生成孩子的性格描述和说话风格，要求：
-1. 合理融合父母双方的性格特点
-2. 可以有自己独特的一面
-3. 说话风格可以混合父母的口癖，也可以有创新
-
-直接输出JSON格式（不要其他文字）：
-{{"personality":"性格描述(50-100字)","language_style":"说话风格/口癖(30-50字)"}}"""
+直接输出JSON（不要其他文字）：
+{{"personality":"性格描述(30字)","language_style":"口癖(15字)"}}"""
         
         try:
             response, _ = self.ai.think_and_act(prompt)
@@ -678,9 +662,9 @@ class GameEngine:
                  
                  text = ""
                  for h in to_summarize:
-                     text += f"[{h['时间']}] {h['描述']} -> {h['结果']}\n"
+                     text += f"{h['描述']}; "
                      
-                 prompt = f"请简要总结以下早期冒险经历（50字以内），作为长期记忆保存：\n{text}"
+                 prompt = f"用30字概括以下经历：{text[:500]}"
                  summary, _ = self.ai.think_and_act(prompt)
                  
                  if summary:
