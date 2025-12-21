@@ -109,7 +109,6 @@ class DynamicEventSystem:
                 modifiers = trait_data.get('modifiers')
                 if not modifiers or modifiers == 'None' or modifiers == 'null':
                     # 根据特质名猜测一个合理的默认效果
-                    import random
                     stat_options = ['STR', 'AGI', 'INT', 'CON', 'CHA', 'LUK']
                     random_stat = random.choice(stat_options)
                     default_bonus = random.randint(1, 3)
