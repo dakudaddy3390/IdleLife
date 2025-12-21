@@ -160,7 +160,7 @@ def create_new_save(config):
     return True
 
 def show_settings_menu(config):
-    """显示设置菜单：选择 API 渠道"""
+    """显示设置菜单：选择 API 渠道和配置选项"""
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         console.print("\n[bold cyan]=========== [设置] API 渠道选择 ===========[/bold cyan]\n")
@@ -195,12 +195,23 @@ def show_settings_menu(config):
         
         console.print(table)
         console.print(f"\n  [dim]当前使用: {config.provider_name}[/dim]")
-        console.print(f"\n  [red]0.[/red] 返回主菜单\n")
         
-        choice = console.input("请选择渠道 (输入数字): ").strip().lower()
+        # 显示流式传输状态
+        streaming_status = "[green]开启[/green]" if config.streaming else "[red]关闭[/red]"
+        console.print(f"\n  [cyan]T.[/cyan] 流式传输: {streaming_status}")
+        console.print(f"  [red]0.[/red] 返回主菜单\n")
+        
+        choice = console.input("请选择 (数字选渠道 / T切换流式): ").strip().lower()
         
         if choice in ['0', 'q', '']:
             return
+        
+        if choice == 't':
+            new_state = config.toggle_streaming()
+            status_text = "开启" if new_state else "关闭"
+            console.print(f"[green]✅ 流式传输已{status_text}[/green]")
+            time.sleep(0.8)
+            continue
         
         try:
             idx = int(choice) - 1
@@ -217,6 +228,7 @@ def show_settings_menu(config):
         except ValueError:
             console.print("[red]请输入有效的数字[/red]")
             time.sleep(0.5)
+
 
 def main():
     """主入口"""

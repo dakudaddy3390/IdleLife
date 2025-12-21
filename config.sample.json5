@@ -36,6 +36,7 @@
         "api_retry_count": 3, // API报错重试次数
         "api_retry_delay": 1, // 每次重试等待时间(秒)
         "history_compress_threshold": 20, // 历史记录条数触发压缩的阈值
-        "history_retention_count": 10 // 压缩后保留的最近记录条数
+        "history_retention_count": 10, // 压缩后保留的最近记录条数
+        "streaming": false // 流式传输 (可在游戏设置菜单中切换)
     }
 }

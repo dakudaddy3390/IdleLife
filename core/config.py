@@ -74,6 +74,14 @@ class Config:
     def history_compress_threshold(self): return self.settings.get('history_compress_threshold', 20)
     @property
     def history_retention_count(self): return self.settings.get('history_retention_count', 10)
+    @property
+    def streaming(self): return self.settings.get('streaming', False)
+    
+    def toggle_streaming(self):
+        """切换流式传输开关"""
+        current = self.settings.get('streaming', False)
+        self.settings['streaming'] = not current
+        return self.settings['streaming']
     
     def get_character_file(self):
         if self.characters and self.active_char_idx < len(self.characters):
