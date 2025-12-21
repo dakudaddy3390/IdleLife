@@ -23,6 +23,24 @@
             "name": "艾尔德利亚大陆",
             "file": "worlds/eldoria.json",
             "description": "剑与魔法的传统异世界"
+        },
+        {
+            "id": "cyber_city",
+            "name": "赛博都市2099",
+            "file": "worlds/cyber_city.json",
+            "description": "充满霓虹灯与义体的未来都市"
+        },
+        {
+            "id": "wuxia",
+            "name": "九州修仙界",
+            "file": "worlds/wuxia.json",
+            "description": "御剑飞行的东方玄幻世界"
+        },
+        {
+            "id": "magic_school",
+            "name": "阿瓦隆魔法学院",
+            "file": "worlds/magic_school.json",
+            "description": "充满神奇生物的魔法校园"
         }
     ],
     "active_world": 0,
@@ -37,6 +55,7 @@
         "api_retry_delay": 1, // 每次重试等待时间(秒)
         "history_compress_threshold": 20, // 历史记录条数触发压缩的阈值
         "history_retention_count": 10, // 压缩后保留的最近记录条数
+        "ai_event_rate": 0.7, // AI生成动态探索事件的概率 (0.0-1.0)
         "streaming": false // 流式传输 (可在游戏设置菜单中切换)
     }
 }

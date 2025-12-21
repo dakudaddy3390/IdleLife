@@ -71,6 +71,11 @@ class Config:
     @property
     def api_retry_delay(self): return self.settings.get('api_retry_delay', 2)
     @property
+    def ai_event_rate(self):
+        """AI生成动态事件的概率"""
+        return self.settings.get('ai_event_rate', 0.7)
+        
+    @property
     def history_compress_threshold(self): return self.settings.get('history_compress_threshold', 20)
     @property
     def history_retention_count(self): return self.settings.get('history_retention_count', 10)

@@ -26,21 +26,23 @@ class DynamicEventSystem:
 请生成一个JSON对象，严格遵守以下格式：
 {EVENT_TEMPLATE}
 
-数值约束：
-1. 奖励或惩罚的绝对值不应超过 {max_val} 点。
-2. 如果奖励是特质(trait)或技能(skill)，请确保数值平衡且有趣。
-3. 如果是物品，请提供 `stats` 字典 (如 {{"attack": 5, "defense": 0}})。
-4. 确保 "value" 字段的数据类型正确（数字/字典）。
+【重要约束】：
+1. 数值奖励/惩罚不应超过 {max_val} 点。
+2. 如果奖励是特质(trait)，**必须**包含modifiers字段，指定具体的属性加成！
+3. 如果是物品，**必须**包含stats字段。
+4. 不要输出null或None，必须是有效的数值。
 
-示例输出：
-{{
-    "title": "神秘泉水",
-    "description": "路边的一口泉水散发着微光。",
-    "choices": [
-        {{"text": "饮用", "effect": "hp", "value": 50}},
-        {{"text": "寻找宝物", "effect": "item", "value": {{"name": "古老指环", "type": "饰品", "stats": {{"luck": 5}}}}}}
-    ]
-}}
+【示例1 - HP恢复】：
+{{"title": "神秘泉水", "description": "路边的一口泉水散发着微光。",
+  "choices": [{{"text": "饮用", "effect": "hp", "value": 50}}]}}
+
+【示例2 - 获得物品】：
+{{"title": "宝箱", "description": "发现一个古老的宝箱。",
+  "choices": [{{"text": "打开", "effect": "item", "value": {{"name": "古老指环", "type": "饰品", "stats": {{"LUK": 5}}}}}}]}}
+
+【示例3 - 获得特质（注意modifiers必填！）】：
+{{"title": "神秘祝福", "description": "神殿中的神像闪烁微光。",
+  "choices": [{{"text": "祈祷", "effect": "trait", "value": {{"name": "神眷者", "desc": "受到神明的庇护", "modifiers": {{"LUK": 2, "MaxHP": 10}}}}}}]}}
 """
         try:
             content, usage = ai.think_and_act(prompt)
@@ -102,22 +104,33 @@ class DynamicEventSystem:
             trait_data = selected.get('value')
             if isinstance(trait_data, dict):
                 t_name = trait_data.get('name', '未知特质')
+                
+                # 确保特质有有效的modifiers
+                modifiers = trait_data.get('modifiers')
+                if not modifiers or modifiers == 'None' or modifiers == 'null':
+                    # 根据特质名猜测一个合理的默认效果
+                    import random
+                    stat_options = ['STR', 'AGI', 'INT', 'CON', 'CHA', 'LUK']
+                    random_stat = random.choice(stat_options)
+                    default_bonus = random.randint(1, 3)
+                    modifiers = {random_stat: default_bonus}
+                    trait_data['modifiers'] = modifiers
+                
                 # 1. 存入 custom_traits
                 if 'custom_traits' not in player.save_data:
                     player.save_data['custom_traits'] = {}
                 player.save_data['custom_traits'][t_name] = trait_data
                 
-                # 2. 只有在此刻获得，但基因里可能没有？
-                # 我们可以强行把这个特质加到基因组里吗？或者加到额外的 "acquired_traits" 列表？
-                # 简单起见，我们假设这是 "后天特质"，不进基因，但进生效列表
-                # 为了兼容，我们把它加到 genome 的 "custom_genes" 字段? 
-                # 或者：直接修改 get_traits 逻辑读取 acquired_traits
+                # 2. 加入后天特质列表
                 if 'acquired_traits' not in player.save_data:
                     player.save_data['acquired_traits'] = []
                 player.save_data['acquired_traits'].append(t_name)
                 
+                # 格式化效果显示
+                effect_str = ", ".join([f"{k}+{v}" for k, v in modifiers.items()]) if modifiers else "神秘效果"
+                
                 print_success(f"🧬 获得了新特质: [{t_name}] {trait_data.get('desc', '')}")
-                print_info(f"   效果: {trait_data.get('modifiers')}")
+                print_info(f"   效果: {effect_str}")
                 
         elif effect == 'item':
             item_data = selected.get('value')

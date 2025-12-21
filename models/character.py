@@ -113,28 +113,22 @@ class Character:
         
         # 生成初始角色的随机基因组
         genome = GeneticSystem.generate_random_genome()
-        gene_bonus = GeneticSystem.genome_to_stats_bonus(genome)
         gene_score = GeneticSystem.calculate_gene_score(genome)
         gene_desc = GeneticSystem.describe_genome(genome)
         
         print_info(f"🧬 角色基因生成: {gene_desc}")
-        
-        # 基于基因计算初始属性
-        base_atk = 8 + gene_bonus['攻击']
-        base_def = 3 + gene_bonus['防御']
-        base_hp = 80 + gene_bonus['MaxHP']
-        base_mp = 40 + gene_bonus['MaxMP']
         
         # 初始化种族和年龄
         race = RaceSystem.infer_race(self.profile)
         age = 18  # 初始年龄
         max_age = RaceSystem.calculate_max_age(race, 1)
         
-        # 获取表型属性 (用于初始化详细数值)
+        # 获取表型属性 (2-6)
         phenotype = GeneticSystem.express_phenotype(genome)
         
         print_info(f"👤 种族: {race} | 初始年龄: {age}岁 | 预期寿命: {max_age}岁")
         
+        # 初始化存档数据
         self.save_data = {
             "current_character_id": char_id,
             "player_genome": genome,  # 保存基因组
@@ -142,57 +136,76 @@ class Character:
             "race": race,
             "age": age,
             "max_age": max_age,
-            # 保存自定义种族和特质（以供AI后续修改）
+            "world_id": self.config.worlds[self.config.active_world_idx]['id'] if hasattr(self.config, 'worlds') else 'eldoria',
+            "custom_skills": [], # AI领悟的技能
+            
+            # 保存自定义数据
             "custom_races": RaceSystem.RACES.copy(),
             "custom_traits": GeneticSystem.TRAITS.copy(),
+            
             "base_stats": {
-                "HP": base_hp, "MaxHP": base_hp, 
-                "MP": base_mp, "MaxMP": base_mp,
-                "等级": 1, "经验": 0, "下一级经验": 100,
-                "攻击": base_atk, "防御": base_def, "金币": 0,
-                # 核心六维属性
-                "力量": phenotype['STR'],
-                "敏捷": phenotype['AGI'],
-                "智力": phenotype['INT'],
-                "体质": phenotype['CON'],
-                "魅力": phenotype['CHA'],
-                "幸运": phenotype['LUK']
+                # 核心六维属性 (STR, AGI, INT, CON, CHA, LUK)
+                # 平衡调整: (表型值+2) * 10
+                # aa(2)->40(弱), Aa(4)->60(强), AA(6)->80(顶尖)
+                "STR": (phenotype['STR'] + 2) * 10,
+                "AGI": (phenotype['AGI'] + 2) * 10,
+                "INT": (phenotype['INT'] + 2) * 10,
+                "CHA": (phenotype['CHA'] + 2) * 10,
+                "CON": (phenotype['CON'] + 2) * 10,
+                "LUK": (phenotype['LUK'] + 2) * 10,
+                
+                # CoC 衍生属性
+                # 初始 Sanity = POW
+                "SAN": (phenotype['LUK'] + 2) * 10, 
+                "MaxSAN": 99,
+                "灵感": (phenotype['INT'] + 2) * 10, # Idea
+                "幸运": (phenotype['LUK'] + 2) * 10, # Luck
+                
+                # 基础技能 (CoC标准: 50=职业水准)
+                # 属性值现在是 40-80
+                "技能_侦查": 25 + int((phenotype['INT'] + 2) * 5),  # 25 + 20~40 = 45~65
+                "技能_聆听": 20 + int((phenotype['INT'] + 2) * 4),  # 20 + 16~32 = 36~52
+                "技能_潜行": 20 + int((phenotype['AGI'] + 2) * 5),  # 20 + 20~40 = 40~60
+                "技能_心理学": 5 + int((phenotype['CHA'] + 2) * 5), # 5 + 20~40 = 25~45
+                "技能_克苏鲁神话": 0,
+                
+                # 衍生属性 (初始化为0，稍后计算)
+                "HP": 0, "MaxHP": 0, 
+                "MP": 0, "MaxMP": 0,
+                "攻击": 0, "防御": 0,
+                
+                # 资源
+                "金币": 0,
+                "等级": 1, 
+                "经验": 0, 
+                "下一级经验": 100
             },
+            
             "inventory": [],
             "equipment": {
                 "weapon": None,
                 "armor": None,
                 "accessory": None
             },
-            "equipment": {
-                "weapon": None,
-                "armor": None,
-                "accessory": None
-            },
-            "location": self.config.get_world_instance().get_starting_location() if hasattr(self.config, 'get_world_instance') else "ruins_city",
-            "status": "正常",
-            "is_alive": True,
+            "skills": [],
+            "achievements": [],
+            "heirlooms": [], # 家族传家宝库
             
             # 家族树
             "family_tree": {
                 "members": {
                     char_id: {
-                        "name": self.profile.get('角色名称', self.profile.get('基本信息', {}).get('名称', '冒险者')),
-                        "generation": 1,
-                        "parent_ids": [],
+                        "name": self.profile.get('角色名称', 'Chi'),
+                        "spouse": None,
                         "children_ids": [],
-                        "spouse_id": None,
-                        "birth_turn": 0,
-                        "death_turn": None,
-                        "death_cause": None,
-                        "personality": self.profile.get('心理特征', ''),
-                        "language_style": self.profile.get('语言特征', ''),
                         "genome": genome,
-                        "gene_score": gene_score,
-                        "final_stats": None
+                        "birth_turn": 0,
+                        "generation": 1
                     }
-                }
+                },
+                "head_id": char_id
             },
+            "family_prestige": 0, # 家族声望
             
             # 关系系统
             "relationships": {},
@@ -207,10 +220,68 @@ class Character:
             },
             "event_history": []
         }
-        # 先初始化属性，再保存
+        
+        # 绑定引用
         self.game_stats = self.save_data['base_stats']
         self.inventory = self.save_data['inventory']
+        
+        # 首次计算衍生属性
+        self.recalculate_stats()
+        # 这一步很重要：将HP/MP回满
+        self.game_stats['HP'] = self.game_stats['MaxHP']
+        self.game_stats['MP'] = self.game_stats['MaxMP']
+        
         self.save()
+    def recalculate_stats(self):
+        """根据核心属性计算衍生属性 (STR, INT, etc -> HP, Atk)"""
+        stats = self.game_stats
+        level = stats.get('等级', 1)
+        
+        # 1. 核心属性 (默认为10，防止旧存档报错)
+        STR = stats.get('STR', 10)
+        AGI = stats.get('AGI', 10)
+        INT = stats.get('INT', 10)
+        CON = stats.get('CON', 10)
+        CHA = stats.get('CHA', 10)
+        LUK = stats.get('LUK', 10)
+        
+        # 2. 装备加成 (临时计算)
+        equipment = self.save_data.get('equipment', {})
+        bonus_stats = {'attack':0, 'defense':0}
+        
+        for slot, item in equipment.items():
+            if item:
+                stats_bonus = item.get('stats', {})
+                bonus_stats['attack'] += stats_bonus.get('attack', 0)
+                bonus_stats['defense'] += stats_bonus.get('defense', 0)
+                # Future: equipment could also add STR/INT
+        
+        # 3. 衍生公式 (数值平衡优化 v2.0)
+        # 设计原则：压缩初期面板，拉开成长空间，增强等级和装备的价值感
+        
+        # MaxHP: 体质*3 + 等级*15 + 基础50
+        # CON=40(aa)Lv1 -> 170HP, CON=80(AA)Lv1 -> 305HP
+        # CON=60Lv10 -> 380HP, CON=60Lv20 -> 530HP
+        stats['MaxHP'] = int(CON * 3 + level * 15 + 50)
+        
+        # MaxMP: 智力*1.5 + 等级*8 + 基础20
+        # INT=40Lv1 -> 88MP, INT=80Lv1 -> 148MP
+        stats['MaxMP'] = int(INT * 1.5 + level * 8 + 20)
+        
+        # 攻击: 力量*0.4 + 敏捷*0.15 + 等级*1.5 + 装备
+        # STR=50AGI=50Lv1 -> ~29攻击, Lv10 -> ~43攻击
+        base_atk = int(STR * 0.4 + AGI * 0.15 + level * 1.5)
+        stats['攻击'] = base_atk + bonus_stats['attack']
+        
+        # 防御: 体质*0.2 + 敏捷*0.1 + 等级*0.8 + 装备
+        # CON=50AGI=50Lv1 -> ~16防御, Lv10 -> ~23防御
+        base_def = int(CON * 0.2 + AGI * 0.1 + level * 0.8)
+        stats['防御'] = base_def + bonus_stats['defense']
+        
+        # 确保当前HP/MP不超标
+        if stats['HP'] > stats['MaxHP']: stats['HP'] = stats['MaxHP']
+        if stats['MP'] > stats['MaxMP']: stats['MP'] = stats['MaxMP']
+
 
     def save(self):
         self.save_data['base_stats'] = self.game_stats
@@ -345,17 +416,47 @@ class Character:
         self.save()
     
     def check_survival(self, attacker_level=1):
-        """濒死判定：基于等级差距计算存活率"""
+        """濒死判定：基于等级差距和运气的存活率"""
         player_level = self.game_stats['等级']
         level_diff = player_level - attacker_level
+        luk = self.game_stats.get('LUK', 10)
         
-        # 基础存活率 = 20% + (等级差×5%)，范围5%-80%
-        survival_rate = max(0.05, min(0.8, 0.2 + level_diff * 0.05))
+        # 1. 基础存活率
+        base_rate = 0.2
+        protected_msg = ""
         
-        survived = random.random() < survival_rate
+        # 2. 新手保护期 (5级以下)
+        if player_level <= 5:
+            base_rate = 0.8
+            protected_msg = " [新手保护生效]"
+        
+        # 3. 等级压制修正 (每级差5%)
+        level_mod = level_diff * 0.05
+        
+        # 4. 幸运加成 (每点幸运+1%)
+        luck_mod = (luk - 10) * 0.01
+        
+        # 计算最终概率
+        final_rate = max(0.05, min(0.95, base_rate + level_mod + luck_mod))
+        
+        # 判定
+        roll = random.random()
+        survived = roll < final_rate
+        
+        # 详细日志 (方便用户理解死因)
         if survived:
-            print_warning(f"🍀 奇迹生还！(存活率: {survival_rate*100:.0f}%)")
+            print_warning(f"🍀 奇迹生还！(概率: {final_rate*100:.0f}% - LUK:{luk}{protected_msg})")
+            # 恢复少量生命
             self.game_stats['HP'] = max(1, int(self.game_stats['MaxHP'] * 0.1))
+        else:
+            # 即使判定失败，如果是幸运儿，还有一次骰子豁免机会
+            if luk >= 15 and random.random() < 0.2:
+                 print_warning(f"🎲 命运女神的垂青！(强制豁免)")
+                 self.game_stats['HP'] = 1
+                 survived = True
+            else:
+                 print_warning(f"💀 逃生失败 (概率: {final_rate*100:.0f}% - 运势不足)")
+                 
         return survived
     
     def die(self, death_cause, total_turns):
@@ -399,54 +500,160 @@ class Character:
         return children[0]
     
     def switch_to_heir(self, heir_id):
-        """切换视角到继承人"""
+        """切换视角到继承人 (深度家族系统)"""
         if heir_id not in self.save_data['family_tree']['members']:
             return False
         
+        # 1. 结算本代家族声望
+        stats = self.game_stats
+        life_stats = self.save_data.get('lifetime_stats', {})
+        
+        # 声望公式：等级*10 + 资产/100 + 击杀数 + 成就数*50
+        prestige_gain = (stats['等级'] * 10) + (stats['金币'] // 100) + \
+                        life_stats.get('总击杀数', 0) + (len(self.save_data.get('achievements', [])) * 50)
+        
+        current_prestige = self.save_data.get('family_prestige', 0)
+        total_prestige = current_prestige + prestige_gain
+        self.save_data['family_prestige'] = total_prestige
+        
+        print_success(f"🏛️ 家族声望结算: 本代贡献 +{prestige_gain} (总声望: {total_prestige})")
+
+        # 2. 打造传家宝
+        equipment = self.save_data.get('equipment', {})
+        inventory = self.inventory
+        
+        # 寻找最好的武器或防具进行注灵
+        best_gear = None
+        best_score = -1
+        
+        # 检查已装备
+        for slot, item in equipment.items():
+            if not item: continue
+            score = item.get('stats', {}).get('attack', 0) + item.get('stats', {}).get('defense', 0)
+            if score > best_score:
+                best_score = score
+                best_gear = item
+        
+        # 如果没装备，检查背包
+        if not best_gear:
+            for item in inventory:
+                if item.get('type') in ['武器', '防具']:
+                    score = item.get('stats', {}).get('attack', 0) + item.get('stats', {}).get('defense', 0)
+                    if score > best_score:
+                        best_score = score
+                        best_gear = item
+        
+        heirloom_msg = ""
+        if best_gear:
+            # 强化传家宝
+            # 每代增强 10% 或至少 +2 攻防
+            enhancement = 0.1
+            stats = best_gear.get('stats', {})
+            for k in stats:
+                boost = max(1, int(stats[k] * enhancement))
+                stats[k] += boost
+            
+            # 重命名 (如果不包含家族前缀)
+            if "传家宝" not in best_gear['name']:
+                best_gear['name'] = f"传家宝·{best_gear['name']}"
+                best_gear['desc'] = f"家族代代相传的宝物，积蓄了先祖的力量。\n{best_gear.get('desc', '')}"
+            else:
+                # 已经是传家宝，增加世代标记
+                if "+" not in best_gear['name']:
+                    best_gear['name'] += " +1"
+                else:
+                    # 解析并增加代数 (简化处理，直接加后缀)
+                    best_gear['name'] += "+"
+
+            heirloom_msg = f"⚔️ 传家宝 [{best_gear['name']}] 已强化并传承！"
+            
+            # 确保传家宝在背包里
+            if best_gear not in inventory:
+                inventory.append(best_gear)
+
+        stats = self.game_stats # 旧stats引用
+        
+        # 3. 切换身份
         heir = self.save_data['family_tree']['members'][heir_id]
         self.save_data['current_character_id'] = heir_id
         self.save_data['is_alive'] = True
         
         # 获取继承人的基因组
         child_genome = heir.get('genome', GeneticSystem.generate_random_genome())
-        gene_bonus = heir.get('gene_bonus', GeneticSystem.genome_to_stats_bonus(child_genome))
         gene_score = heir.get('gene_score', GeneticSystem.calculate_gene_score(child_genome))
-        gene_desc = GeneticSystem.describe_genome(child_genome)
         
-        # 基于基因计算初始属性
-        parent_stats = self.game_stats
-        base_hp = 80 + gene_bonus.get('MaxHP', 0)
-        base_mp = 40 + gene_bonus.get('MaxMP', 0)
-        base_atk = 8 + gene_bonus.get('攻击', 0) # 修正：不再直接继承父代属性，防止开局秒杀
-        base_def = 3 + gene_bonus.get('防御', 0)
+        # 4. 基于基因 + 家族声望 初始化核心属性
+        # 必须初始化 STR/AGI 等，否则 recalculate_stats 会回退到默认值 10
+        phenotype = GeneticSystem.express_phenotype(child_genome)
         
-        # 资产继承
-        inherited_gold = parent_stats.get('金币', 0) # 全额继承金币
-        inherited_inventory = self.inventory[:] # 全额继承背包
-        inherited_equipment = self.save_data.get('equipment', {}).copy() # 全额继承装备
-
+        # 声望加成：每100声望 +1 全属性 (大幅增强家族传承感)
+        prestige_bonus = total_prestige // 100
+        
+        # 继承资产
+        inherited_gold = stats.get('金币', 0)
+        inherited_inventory = inventory[:]
+        inherited_equipment = self.save_data.get('equipment', {}).copy()
+        
+        # 构建新的 base_stats (完全重置状态)
         self.save_data['base_stats'] = {
-            "HP": base_hp, "MaxHP": base_hp, 
-            "MP": base_mp, "MaxMP": base_mp,
+            "STR": (phenotype['STR'] + 2) * 10 + prestige_bonus,
+            "AGI": (phenotype['AGI'] + 2) * 10 + prestige_bonus,
+            "INT": (phenotype['INT'] + 2) * 10 + prestige_bonus,
+            "CON": (phenotype['CON'] + 2) * 10 + prestige_bonus,
+            "CHA": (phenotype['CHA'] + 2) * 10 + prestige_bonus,
+            "LUK": (phenotype['LUK'] + 2) * 10 + prestige_bonus,
+            
+            "SAN": (phenotype['LUK'] + 2) * 10,
+            "MaxSAN": 99,
+            "灵感": (phenotype['INT'] + 2) * 10,
+            "幸运": (phenotype['LUK'] + 2) * 10,
+            
+            # CoC 基础技能继承 (稍微给点加成代表家学渊源?)
+            "技能_侦查": 25 + int((phenotype['INT'] + 2) * 5) + prestige_bonus,
+            "技能_聆听": 20 + int((phenotype['INT'] + 2) * 4) + prestige_bonus,
+            "技能_潜行": 20 + int((phenotype['AGI'] + 2) * 5) + prestige_bonus,
+            "技能_心理学": 5 + int((phenotype['CHA'] + 2) * 5) + prestige_bonus,
+            "技能_克苏鲁神话": 0,
+            
+            # 衍生属性 (由 recalculate_stats 计算)
+            "HP": 0, "MaxHP": 0, "MP": 0, "MaxMP": 0,
+            "攻击": 0, "防御": 0,
+            
             "等级": 1, "经验": 0, "下一级经验": 100,
-            "攻击": base_atk,
-            "防御": base_def,
             "金币": inherited_gold
         }
-        self.game_stats = self.save_data['base_stats']
         
-        # 继承物品
+        # 应用
+        self.game_stats = self.save_data['base_stats']
         self.inventory = inherited_inventory
         self.save_data['inventory'] = self.inventory
         self.save_data['equipment'] = inherited_equipment
-
-        # 保存基因组到存档
+        
+        # 重新计算面板
+        self.recalculate_stats()
+        # 回满状态
+        self.game_stats['HP'] = self.game_stats['MaxHP']
+        self.game_stats['MP'] = self.game_stats['MaxMP']
+        
+        # 保存基因组
         self.save_data['player_genome'] = child_genome
         self.save_data['player_gene_score'] = gene_score
         
-        print_info(f"🧬 继承人基因: {gene_desc}")
+        print_success(f"👑 家族传承完成！第 {heir.get('generation', 2)} 代继承人 {heir.get('name')} 继承了家业。")
         
-        # 更新profile信息（用于AI）
+        # 家族秘术/技能继承
+        # 简单处理：保留一部分技能
+        old_skills = self.save_data.get('custom_skills', [])
+        if old_skills:
+            # 随机丢失 20% 技能，或者保留全部
+            self.save_data['custom_skills'] = old_skills # 完整传承
+            print_info(f"📚 继承了 {len(old_skills)} 个家族秘术。")
+            
+        if heirloom_msg:
+            print_info(heirloom_msg)
+        print_success(f"🌟 家族底蕴加成: 全属性+{prestige_bonus}")
+        
+        # 更新profile信息
         self.profile['角色名称'] = heir.get('name', '继承者')
         self.profile['心理特征'] = heir.get('personality', {})
         self.profile['语言特征'] = heir.get('language_style', {})
@@ -464,19 +671,69 @@ class Character:
     def gain_exp(self, amount):
         print_success(f"✨ 获得经验: {amount}")
         self.game_stats['经验'] += amount
-        if self.game_stats['经验'] >= self.game_stats['下一级经验']:
+        # 循环升级，支持一次过多级
+        while self.game_stats['经验'] >= self.game_stats['下一级经验']:
             self.level_up()
 
+    def get_next_level_exp(self, level):
+        # 宝可梦风格的中速曲线：1.2 * N^3
+        # Lv1 -> Lv2: ~10 exp
+        # Lv10 -> Lv11: ~1300 exp
+        # Lv50 -> Lv51: ~150,000 exp
+        return int(1.2 * (level + 1) ** 3)
+
     def level_up(self):
+        old_level = self.game_stats['等级']
         self.game_stats['等级'] += 1
         self.game_stats['经验'] -= self.game_stats['下一级经验']
-        self.game_stats['下一级经验'] = int(self.game_stats['下一级经验'] * 1.5)
-        self.game_stats['MaxHP'] += 20
-        self.game_stats['MaxMP'] += 10
-        self.game_stats['攻击'] += 2
-        self.game_stats['防御'] += 1
+        
+        # 更新下一级所需经验
+        self.game_stats['下一级经验'] = self.get_next_level_exp(self.game_stats['等级'])
+        
+        # 获取基因表型（用于计算成长率）
+        genome = self.save_data.get('player_genome', {})
+        phenotype = GeneticSystem.express_phenotype(genome)
+        
+        # 核心属性成长公式 v2.0：大幅增强升级收益感
+        # 基础成长 = 表型分(2-6) * 0.3 + 随机(0.3-1.2)
+        # aa(2): 0.9~1.8/级, Aa(4): 1.5~2.4/级, AA(6): 2.1~3.0/级
+        growth = {}
+        for stat in ['STR', 'AGI', 'INT', 'CON', 'CHA', 'LUK']:
+            base_growth = phenotype.get(stat, 2) * 0.3
+            rand_growth = random.uniform(0.3, 1.2)
+            total_gain = base_growth + rand_growth
+            
+            # 累加到属性上
+            old_val = self.game_stats.get(stat, 10)
+            self.game_stats[stat] = old_val + total_gain
+            growth[stat] = total_gain
+        
+        # 记录旧的衍生属性以便对比
+        old_hp = self.game_stats.get('MaxHP', 100)
+        old_atk = self.game_stats.get('攻击', 10)
+        
+        # 重新计算衍生属性 (HP, Atk...)
+        self.recalculate_stats()
+        
+        # 升级回满
         self.game_stats['HP'] = self.game_stats['MaxHP']
         self.game_stats['MP'] = self.game_stats['MaxMP']
+        
+        # 计算衍生属性的变化量
+        hp_gain = self.game_stats['MaxHP'] - old_hp
+        atk_gain = self.game_stats['攻击'] - old_atk
+        
+        # self.session_stats['升级次数'] += 1 # 移除了，Character无法访问session_stats
+        print_success(f"🆙 升级了! (Lv.{old_level} -> Lv.{self.game_stats['等级']})")
+        
+        # 格式化成长日志
+        growth_msg = []
+        for s, g in growth.items():
+            if g > 0.4: growth_msg.append(f"[bold green]{s}+{g:.1f}[/bold green]")
+            else: growth_msg.append(f"{s}+{g:.1f}")
+            
+        print_info(f"   核心成长: {' | '.join(growth_msg)}")
+        print_info(f"   面板提升: MaxHP+{hp_gain}, 攻击+{atk_gain}")
         
         # 增加寿命
         race = self.save_data.get('race', '人类')

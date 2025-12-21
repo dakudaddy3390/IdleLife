@@ -23,6 +23,23 @@ import uuid
 class GameEngine:
     def __init__(self, config=None, reset_save=False, save_file=None):
         self.config = config if config else Config()
+        
+        # 根据存档自动切换世界
+        if save_file and not reset_save:
+            try:
+                with open(save_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                world_id = data.get('world_id')
+                if world_id:
+                    # 查找对应的世界索引
+                    for i, w in enumerate(self.config.worlds):
+                        if w['id'] == world_id:
+                            self.config.active_world_idx = i
+                            print_info(f"🌍 根据存档自动切换世界至: {w['name']}")
+                            break
+            except Exception as e:
+                print_warning(f"读取存档世界信息失败: {e}")
+
         self.ai = AIBrain(self.config)
         self.world = GameWorld(self.config)
         self.player = Character(self.config, reset_save=reset_save, save_file=save_file)
@@ -109,30 +126,27 @@ class GameEngine:
                 return True
 
             # 怪物反击
-            # 简单AI：如果有技能，随机用；否则普攻
-            # 这里先简化，只用普攻
-            e_atk = enemy.get('攻击', 5)
-            p_def = player.get_defense()
-            
             # 闪避判定
             dodge_rate = player.get_dodge_bonus() / 100.0 + (p_stats['等级'] - enemy.get('等级',1)) * 0.02
             if random.random() < max(0.05, dodge_rate):
                 print_info(f"💨 你闪避了 {enemy['名称']} 的攻击")
                 continue
-                
-            # 怪物伤害计算 (复用CombatSystem逻辑? 暂时手动算)
-            base_dmg = max(1, e_atk - p_def)
-            variation = random.randint(-int(base_dmg*0.1), int(base_dmg*0.1))
-            final_dmg = max(1, base_dmg + variation)
             
-            player.take_damage(final_dmg)
+            # 使用战斗系统执行怪物回合 (怪物可能会放技能！)
+            e_dmg, e_crit = CombatSystem.execute_turn(enemy, player, console)
+            
+            player.take_damage(e_dmg)
             self.session_stats['受伤次数'] += 1
-            print_warning(f"🛡️  {enemy['名称']} 反击造成 {final_dmg} 点伤害 (剩余HP: {p_stats['HP']}/{p_stats['MaxHP']})")
+            
+            crit_msg = " [bold red](暴击!)[/bold red]" if e_crit else ""
+            print_warning(f"🛡️  {enemy['名称']} 反击造成 {e_dmg} 点伤害{crit_msg} (剩余HP: {p_stats['HP']}/{p_stats['MaxHP']})")
             
             if p_stats['HP'] <= 0:
                 # 濒死判定
                 if player.check_survival(enemy.get('等级', 1)):
-                    continue
+                    # 生还后逃离战斗，不再继续送死
+                    print_success(f"🏃 趁着最后一丝力气，你拼命逃离了战场！")
+                    return True  # 视为战斗结束（逃脱）
                 else:
                     self.handle_death(f"被 {enemy['名称']} 击杀", f"被{enemy['名称']}击杀")
                     return False
@@ -155,7 +169,8 @@ class GameEngine:
         if heir_id:
             print_info(f"👶 继承人: {heir.get('name')} 将继续冒险...")
             if self.player.switch_to_heir(heir_id):
-                console.input("[按回车键继续...]")
+                with console.status("[bold green]正在完成家族权力交接... (5s)[/bold green]"):
+                    time.sleep(5)
                 return True # 继承成功
         
         print_error("💔 没有继承人，家族血脉断绝...")
@@ -164,27 +179,109 @@ class GameEngine:
 
     def construct_prompt(self, event_type, event_data, extra_context=""):
         p = self.player
+        stats = p.game_stats
         
-        prompt = f"""角色：{p.name} (Lv{p.game_stats['等级']} {p.save_data.get('race', '人类')})
-特质：{','.join(p.get_traits()) if p.get_traits() else '无'}
-事件：[{event_type}] {event_data}
-HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
+        # 1. 核心属性摘要 (只列出突出的)
+        core_stats = []
+        for k in ['STR', 'AGI', 'INT', 'CON', 'CHA', 'LUK']:
+            val = stats.get(k, 10)
+            if val >= 20: core_stats.append(f"{k}高({val})")
+            elif val <= 5: core_stats.append(f"{k}低({val})")
+        
+        attr_desc = ", ".join(core_stats) if core_stats else "属性均衡"
+        
+        # 2. 精神状态
+        san = stats.get('SAN', 50)
+        max_san = stats.get('MaxSAN', 99)
+        san_status = "精神正常"
+        if san < 20: san_status = "精神崩溃/疯狂"
+        elif san < 40: san_status = "精神恍惚/恐惧"
+        
+        # 3. 提取角色人设核心信息
+        char_desc = p.profile.get('角色描述', '一名冒险者')[:150]  # 限制长度
+        
+        # 心理特征摘要
+        psych = p.profile.get('心理特征', {})
+        psych_summary = ""
+        if isinstance(psych, dict):
+            # 提取关键词
+            keywords = []
+            for section, data in psych.items():
+                if isinstance(data, dict) and '关键词' in data:
+                    keywords.extend(data['关键词'][:2])  # 每个部分取前2个关键词
+            if keywords:
+                psych_summary = "、".join(keywords[:6])  # 最多6个关键词
+        elif isinstance(psych, str):
+            psych_summary = psych[:50]
+        
+        # 语言特征摘要
+        lang = p.profile.get('语言特征', {})
+        lang_summary = ""
+        if isinstance(lang, dict):
+            keywords = []
+            for section, data in lang.items():
+                if isinstance(data, dict) and '关键词' in data:
+                    keywords.extend(data['关键词'][:2])
+            if keywords:
+                lang_summary = "、".join(keywords[:6])
+            # 尝试获取示例
+            examples = []
+            for section, data in lang.items():
+                if isinstance(data, dict) and '示例' in data:
+                    examples.extend(data['示例'][:1])  # 每部分取1个示例
+            if examples:
+                lang_summary += f" | 示例: \"{examples[0][:30]}...\""
+        elif isinstance(lang, str):
+            lang_summary = lang[:50]
+        
+        prompt = f"""【角色扮演指令】
+你现在必须完全扮演角色：{p.name}
 
-请以第一人称写一句简短反应（30字以内），符合角色语言风格。不要编造不存在的信息。
+【角色设定】
+{char_desc}
+
+【性格特点】{psych_summary if psych_summary else '无特殊设定'}
+【说话风格】{lang_summary if lang_summary else '正常说话'}
+【当前状态】Lv{stats['等级']} {p.save_data.get('race', '人类')} | HP:{stats['HP']}/{stats['MaxHP']} | {san_status}
+【特质】{','.join(p.get_traits()) if p.get_traits() else '无'}
+
+【当前事件】
+[{event_type}] {event_data}
+{extra_context}
+
+【任务】
+以{p.name}的第一人称写一句简短反应（30字以内）。
+
+【重要要求】
+1. 必须使用角色的说话风格和口癖！例如chi酱应该用"咱"自称，带颜文字和表情。
+2. 即使在异世界，角色的语言习惯和人设也不会改变。
+3. 不要使用与角色人设不符的术语。技术宅不会说"运转周天"，会说"这buff真强"。
 """
         return prompt
 
     def ai_generate_child_personality(self, p1_name, p1_personality, p1_style, 
                                        p2_name, p2_personality, p2_style, child_gender):
-        """使用AI融合父母性格生成子嗣性格"""
-        prompt = f"""根据父母特点生成孩子性格。
-
-父/母1: {p1_name}
+        """使用AI融合父母性格生成子嗣性格 (引入骰子判定天赋)"""
+        
+        from systems.dice import DiceSystem
+        
+        # 1. 投掷骰子决定先天运势
+        # 使用默认50或父母平均幸运值
+        luck_check, level, success = DiceSystem.check("投胎运势", 50)
+        
+        fortune_desc = "普通孩子"
+        if level == "critical": fortune_desc = "天选之子(大成功)"
+        elif level == "fumble": fortune_desc = "被诅咒的孩子(大失败)"
+        elif level == "hard": fortune_desc = "聪慧过人"
+        
+        prompt = f"""请根据父母特点及【先天运势】生成孩子性格和名字。
+父/母1: {p1_name} (性格:{p1_personality})
 父/母2: {p2_name}
 孩子性别: {child_gender}
+先天运势判定: {fortune_desc} (请务必在性格中体现这一点)
 
-直接输出JSON（不要其他文字）：
-{{"personality":"性格描述(30字)","language_style":"口癖(15字)"}}"""
+请直接输出JSON（不要其他文字）：
+{{"name":"孩子名字(需符合父母文化风格)","personality":"性格描述(30字)","language_style":"口癖(15字)"}}"""
         
         try:
             response, _ = self.ai.think_and_act(prompt)
@@ -193,7 +290,7 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                 match = re.search(r'\{.*\}', response.replace('\n', ' '), re.DOTALL)
                 if match:
                     result = json.loads(match.group())
-                    return (result.get('personality', ''), result.get('language_style', ''))
+                    return (result.get('personality', ''), result.get('language_style', ''), result.get('name'))
         except Exception as e:
             print_warning(f"AI生成失败，使用默认融合: {e}")
         
@@ -204,12 +301,18 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
         else:
             personality = f"性格像{p2_name}，但也有{p1_name}的一面"
             style = p2_style[:40] if p2_style else p1_style[:40]
-        return (personality, style)
+            
+        return personality, style, None
+
 
     def process_ai_response(self, response, usage):
         if response:
-            print_character(self.player.name, response)
-            self.player.add_event_to_history("AI日志", response, "")
+            # 处理可能的骰子申请 [CHECK: 技能]
+            from systems.dice import DiceSystem
+            processed_response = DiceSystem.parse_and_roll(response, self.player)
+            
+            print_character(self.player.name, processed_response)
+            self.player.add_event_to_history("AI日志", processed_response, "")
         
         if usage:
             self.session_stats['prompt_tokens'] += usage.get('prompt_tokens', 0)
@@ -254,6 +357,8 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                 # 实际可以加到family_tree里，但作为NPC可能不需要完整数据
                 print_success(f"💍 喜结良缘！你与 {spouse_name} 结婚了。")
                 p.add_event_to_history("结婚", f"与 {spouse_name} 结婚", "家族诞生")
+                with console.status("[bold green]💍 婚礼现场... (庆祝 5s)[/bold green]"):
+                    time.sleep(5)
 
     def handle_birth(self, parent_data, spouse_id, spouse_name="配偶"):
         """处理生子逻辑"""
@@ -298,14 +403,20 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
             p2 = "未知"
             p2_style = "未知"
             
-            c_personality, c_style = self.ai_generate_child_personality(
+            c_personality, c_style, c_name = self.ai_generate_child_personality(
                 p.name, p1, p1_style,
                 spouse_name, p2, p2_style,
                 child_gender
             )
             child_data['personality'] = c_personality
             child_data['language_style'] = c_style
-        except:
+            
+            if c_name:
+                child_data['name'] = c_name
+                child_name = c_name
+                print_info(f"✨ AI为孩子起名: {c_name}")
+        except Exception as e:
+            # print_error(f"性格生成错误: {e}")
             pass
         
         p.save_data['family_tree']['members'][child_id] = child_data
@@ -314,6 +425,8 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
         
         print_success(f"👶 喜得贵子！{child_name} 出生了。(基因评分: {child_data['gene_score']})")
         p.add_event_to_history("生子", f"{child_name} 出生", "家族延续")
+        with console.status("[bold green]👶 庆祝新生... (庆祝 5s)[/bold green]"):
+            time.sleep(5)
 
     def process_life_events(self):
         """处理生命事件：结婚、亲密、生子"""
@@ -368,6 +481,10 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                 _, is_pregnant = RelationshipSystem.attempt_intimacy(p, spouse_npc)
                 if is_pregnant:
                     self.handle_birth(member, spouse_id, spouse_name)
+                    
+            # 伴侣传授技能 (2% 概率)
+            if random.random() < 0.02:
+                 CombatSystem.ai_teach_skill(p, spouse_name, "伴侣", self.ai)
 
         # 3. 致命诱惑/艳遇判定
         # 必须确认已婚才触发出轨逻辑
@@ -429,29 +546,61 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
         lover_name = lover_npc.get('名称', '神秘人')
         lover_desc = lover_npc.get('描述', '充满魅力')
         
-        # 2. 构建AI Prompt
+        # 2. 构建AI Prompt (Enhanced Roleplay)
         traits = player.get_traits()
         spouse_name = member.get('spouse_name', '配偶')
         children_ids = member.get('children_ids', [])
         num_children = len(children_ids)
         
+        # 获取人设详细信息
+        char_desc = player.profile.get('角色描述', '一名普通的冒险者')[:150]
+        
+        # 提取语言特征关键词（与construct_prompt一致）
+        lang = player.profile.get('语言特征', {})
+        lang_summary = ""
+        if isinstance(lang, dict):
+            keywords = []
+            examples = []
+            for section, data in lang.items():
+                if isinstance(data, dict):
+                    if '关键词' in data:
+                        keywords.extend(data['关键词'][:2])
+                    if '示例' in data:
+                        examples.extend(data['示例'][:1])
+            if keywords:
+                lang_summary = "、".join(keywords[:6])
+            if examples:
+                lang_summary += f" | 例: \"{examples[0][:25]}...\""
+        elif isinstance(lang, str):
+            lang_summary = lang[:50]
+        else:
+            lang_summary = "正常说话"
+
         # 准确描述家庭状况
         if num_children == 0:
             family_desc = f"已婚，配偶是 {spouse_name}，暂时没有孩子"
         else:
             family_desc = f"已婚，配偶是 {spouse_name}，有 {num_children} 个孩子"
         
-        prompt = f"""角色决策时刻：
-我是 {player.name}，今年 {player.save_data.get('age')} 岁。
-我的性格标签：[{', '.join(traits)}]
-我的家庭状况：{family_desc}。
+        prompt = f"""【角色扮演指令】
+你现在必须完全沉浸在角色：{player.name} 中。
+你的设定：{char_desc}
+你的口癖/说话风格：{lang_summary}
+你的性格标签：[{', '.join(traits)}]
+你的现状：{family_desc}
 
-事件：
-我在外面偶遇了 {lover_name} ({lover_desc})。对方似乎对我有意思，气氛暧昧，充满诱惑。
-根据我的性格和当前状况，我会怎么做？
+【触发事件】：
+你在外面偶遇了 {lover_name} ({lover_desc})。对方对你释放了强烈的费洛蒙，试图诱惑你出轨，气氛变得燥热暧昧。
 
-请基于以上【真实信息】做出决定，不要编造不存在的事实。
-格式要求：先简述理由(50字以内)，然后在最后一行输出：[DECISION: ACCEPT] 或 [DECISION: REJECT]
+【任务】：
+请以 {player.name} 的第一人称视角，用**极度符合你人设和口癖**的语气描写你的内心弹幕和最终决定。
+- 严禁使用“虽然...但是...责任感”这种AI味的说教！
+- 如果你是傲娇，就骂骂咧咧地拒绝；如果是魅魔，可能欲拒还迎；如果是老实人，就惊慌失措。
+- 必须生动、口语化。
+
+格式要求：
+一段内心独白(50字以内)
+[DECISION: ACCEPT] 或 [DECISION: REJECT]
 """
         # 3. 调用AI
         print_info(f"🤔 {player.name} 正在面对诱惑进行内心挣扎...")
@@ -516,6 +665,10 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                 self.session_stats['completion_tokens'] += usage.get('completion_tokens', 0)
                 self.session_stats['total_tokens'] += usage.get('total_tokens', 0)
         
+        # 1.2 顿悟事件 (领悟新技能)
+        if random.random() < 0.02 and self.player.game_stats['等级'] >= 5:
+             CombatSystem.ai_learn_skill(self.player, self.ai)
+
         # 1.5 处理生命事件 (结婚生子)
         self.process_life_events()
         
@@ -542,16 +695,123 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
         
         elif event_type == "探索":
             self.session_stats['探索次数'] += 1
-            # 简单探索逻辑
-            exp = 5
-            gold = random.randint(0, 3)
+            region_name = self.world.get_region(current_region_id).get('名称', current_region_id)
+            world_name = self.world.data.get('世界名称', '异世界')
+            
+            # 引入骰子系统
+            from systems.dice import DiceSystem
+
+            explore_desc = ""
+            # 根据配置概率 AI 生成独特文案
+            # 引入骰子系统
+            from systems.dice import DiceSystem
+            import json
+            import re
+            
+            # 预先进行幸运判定，给 AI 参考，但最终由 AI 制定的结果为准
+            luck_val = self.player.game_stats.get('幸运', 50)
+            luck_roll, level, success = DiceSystem.check("探索运势", luck_val)
+            luck_context = f"运势：{level} ({luck_roll})"
+
+            explore_json = None
+            found_item = None
+            
+            if random.random() < self.config.ai_event_rate:
+                # 请求 AI 直接返回结构化数据
+                prompt = (f"角色在{world_name}的{region_name}探索。{luck_context}。\n"
+                          f"请生成探索结果，包含：简短经历描述、发现的物品(可选)、理智值扣除(如有恐怖)。\n"
+                          f"直接输出JSON：\n"
+                          f'{{"desc": "经历描述(30字)", "item": "物品名或null", "san_cost": 0}}')
+                try:
+                    content, usage = self.ai.think_and_act(prompt)
+                    if content:
+                        match = re.search(r'\{.*\}', content.replace('\n', ' '), re.DOTALL)
+                        if match:
+                            explore_json = json.loads(match.group())
+                            self.process_ai_response(None, usage)
+                except Exception as e:
+                    # print_warning(f"AI 生成解析失败: {e}")
+                    pass
+
+            explore_desc = ""
+            is_critical = False
+            DiceSystem.last_result = None # 重置状态
+            
+            # A. 使用 AI 生成的结果
+            if explore_json:
+                explore_desc = explore_json.get('desc', '你四处看了看。')
+                
+                # 在处理物品前，先解析描述中的骰子判定
+                explore_desc = DiceSystem.parse_and_roll(explore_desc, self.player)
+                if DiceSystem.last_result == 'critical': is_critical = True
+                
+                # 处理物品
+                item_name = explore_json.get('item')
+                if item_name and str(item_name).lower() != 'null' and str(item_name).lower() != 'none':
+                     # 尝试在数据库找，找不到就创建临时物品
+                     found_item = None
+                     # 简单的查找逻辑
+                     base_item = self.world.get_random_item() or {"type": "杂物", "stats": {}}
+                     base_item = base_item.copy()
+                     base_item['name'] = item_name
+                     base_item['desc'] = f"在{region_name}发现的{item_name}"
+                     
+                     self.player.inventory.append(base_item)
+                     explore_desc += f" (获得: {item_name})"
+                
+                # 处理 Sanity 扣除
+                cost = explore_json.get('san_cost', 0)
+                if cost > 0:
+                    current_san = self.player.game_stats.get('SAN', 50)
+                    self.player.game_stats['SAN'] = max(0, current_san - cost)
+                    explore_desc += f" [理智 -{cost}]"
+                    if self.player.game_stats['SAN'] < 20: 
+                        explore_desc += " (精神崩溃...)"
+
+            # B. Fallback 到传统逻辑
+            else:
+                explore_desc = self.world.get_random_exploration_text()
+                # ... (保留原有的 {item} 替换逻辑作为保底，此处简化)
+                if "{item}" in explore_desc:
+                     found_item = self.world.get_random_item() or {"name": "神秘碎片"}
+                     item_name = found_item.get('name', '未知物品')
+                     explore_desc = explore_desc.replace("{item}", item_name)
+                     self.player.inventory.append(found_item)
+                     
+                # 也要检查传统文本里是否有骰子判定
+                explore_desc = DiceSystem.parse_and_roll(explore_desc, self.player)
+                if DiceSystem.last_result == 'critical': is_critical = True
+
+            # 随机奖励逻辑 (基础经验)
+            exp = 5 + random.randint(0, self.player.game_stats['等级'])
+            gold = 0
+            
+            # 如果没找到物品，才给金币
+            if not found_item and random.random() < 0.2:
+                gold = random.randint(1, 10)
+            
+            # 大成功奖励翻倍
+            if is_critical:
+                exp *= 5
+                gold = max(5, gold * 5) # 确保大成功至少有5金币(即使原本是0)
+                print_success("✨ 吉星高照！大成功获得 5倍 奖励！")
+
             self.player.gain_exp(exp)
             self.player.game_stats['金币'] += gold
             self.session_stats['总经验'] += exp
             
-            region_name = self.world.get_region(current_region_id).get('名称', current_region_id)
-            print_event("探索", f"你在 {region_name} 探索了一番，获得了 {exp} 经验和 {gold} 金币。")
-            ai_input_data = f"在{region_name}探索，略有斩获。"
+            # 发放物品
+            if found_item:
+                self.player.inventory.append(found_item)
+            
+            # 显示更沉浸的文本
+            reward_text = f" (经验+{exp}" 
+            if gold > 0: reward_text += f", 金币+{gold}"
+            if found_item: reward_text += f", 获得: {item_name}"
+            reward_text += ")"
+            
+            print_event("探索", f"[{region_name}] {explore_desc}{reward_text}")
+            ai_input_data = f"在{region_name}探索: {explore_desc}"
             
         elif event_type == "休息":
             self.session_stats['休息次数'] += 1
@@ -640,11 +900,26 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                     self.apply_game_effect(adv.get('效果', {}))
                     ai_input_data = f"触发奇遇：{adv['名称']}"
 
-        # 4. AI 生成日志 (降低频率，每3回合或重要事件才生成)
-        if self.session_stats['回合数'] % 3 == 0 or event_type in ["奇遇", "NPC"] or self.player.game_stats['HP'] < self.player.game_stats['MaxHP']*0.3:
-            prompt = self.construct_prompt(event_type, ai_input_data)
-            content, usage = self.ai.think_and_act(prompt)
-            self.process_ai_response(content, usage)
+
+
+        
+        # 4. 生成角色主观反应 (根据配置概率)
+        # 恢复丢失的逻辑
+        if ai_input_data and random.random() < self.config.ai_event_rate:
+             try:
+                 prompt = self.construct_prompt(event_type, ai_input_data)
+                 # 加上简单的防破防指令
+                 prompt += "\n(请以第一人称简短吐槽或感慨，不要重复事件描述，30字以内)"
+                 
+                 reaction, usage = self.ai.think_and_act(prompt)
+                 if reaction:
+                     # 清理可能的多余符号
+                     reaction = reaction.strip('"').strip()
+                     print_character(self.player.name, reaction)
+                     self.process_ai_response(None, usage)
+             except Exception as e:
+                 # print_error(f"AI反应生成错误: {e}")
+                 pass
 
         # 0.5 历史记录压缩逻辑
         if self.config.history_limit > 0:
@@ -747,7 +1022,10 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
         # 打印本次会话总结
         self.print_session_summary()
         
+        
         self.player.update_lifetime_stats(self.session_stats, duration)
+        
+        console.input("\n请按回车键结束游戏...")
 
     def apply_game_effect(self, effect):
         """应用游戏效果 (解析JSON)"""
@@ -873,8 +1151,9 @@ HP: {p.game_stats['HP']}/{p.game_stats['MaxHP']}
                 text += f"[{h['时间']}] {h['描述']} -> {h['结果']}\n"
                 
             prompt = f"""
-请根据以下冒险日志，用一段通俗幽默的话总结玩家这次的游戏经历（100字左右）：
+请根据以下冒险日志，用一段通俗幽默的话总结 {self.player.name} 这次的游戏经历（100字左右）：
 重点关注：发生了什么趣事、获得了什么成就、以及最后的结局（是主动退出还是意外死亡）。
+请用第三人称叙述，像在讲故事一样。
 
 日志：
 {text}
