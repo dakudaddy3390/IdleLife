@@ -1,4 +1,4 @@
-# 🎮 AI 放置挂机游戏
+# 🎮 Idle Life (挂机人生)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
