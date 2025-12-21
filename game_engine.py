@@ -1,6 +1,7 @@
 import time
 import random
 import sys
+import json
 import msvcrt
 from rich.layout import Layout
 from rich.live import Live
@@ -384,9 +385,10 @@ class GameEngine:
                 if is_pregnant:
                     self.handle_birth(member, spouse_id, spouse_name)
 
-        # 3. 致命诱惑 (出轨/艳遇判定) - 由角色性格决定是否跨越雷池
-        # 仅针对已婚角色 (或者单身时的艳遇? 暂且只做婚后出轨逻辑)
-        if member.get('spouse_id') and random.random() < 0.05: # 5% 概率遇到诱惑
+        # 3. 致命诱惑/艳遇判定
+        # 必须确认已婚才触发出轨逻辑
+        spouse_id_check = member.get('spouse_id')
+        if spouse_id_check and member.get('spouse_name') and random.random() < 0.05:
             self.process_temptation(p, member)
 
     def process_child_growth(self):
@@ -431,7 +433,11 @@ class GameEngine:
         self.player.save()
 
     def process_temptation(self, player, member):
-        """处理诱惑事件: AI决策版"""
+        """处理诱惑事件: AI决策版 (仅已婚角色)"""
+        # 安全检查：必须已婚
+        if not member.get('spouse_id') or not member.get('spouse_name'):
+            return
+        
         # 1. 生成诱惑对象
         lover_npc = self.world.get_random_npc(npc_type="可结伴")
         if not lover_npc: return
@@ -442,21 +448,26 @@ class GameEngine:
         # 2. 构建AI Prompt
         traits = player.get_traits()
         spouse_name = member.get('spouse_name', '配偶')
-        num_children = len(member.get('children_ids', []))
+        children_ids = member.get('children_ids', [])
+        num_children = len(children_ids)
         
-        prompt = f"""
-角色决策时刻：
+        # 准确描述家庭状况
+        if num_children == 0:
+            family_desc = f"已婚，配偶是 {spouse_name}，暂时没有孩子"
+        else:
+            family_desc = f"已婚，配偶是 {spouse_name}，有 {num_children} 个孩子"
+        
+        prompt = f"""角色决策时刻：
 我是 {player.name}，今年 {player.save_data.get('age')} 岁。
 我的性格标签：[{', '.join(traits)}]
-我的家庭状况：已婚，配偶是 {spouse_name}，有 {num_children} 个孩子。
+我的家庭状况：{family_desc}。
 
 事件：
 我在外面偶遇了 {lover_name} ({lover_desc})。对方似乎对我有意思，气氛暧昧，充满诱惑。
-根据我的性格和当前状况，我会怎么做？是忠于家庭果断拒绝，还是顺从欲望通过？
+根据我的性格和当前状况，我会怎么做？
 
-请必须做出决定，并简述理由。
-格式要求：
-请在最后一行严格输出决策结果：[DECISION: ACCEPT] 或 [DECISION: REJECT]
+请基于以上【真实信息】做出决定，不要编造不存在的事实。
+格式要求：先简述理由(50字以内)，然后在最后一行输出：[DECISION: ACCEPT] 或 [DECISION: REJECT]
 """
         # 3. 调用AI
         print_info(f"🤔 {player.name} 正在面对诱惑进行内心挣扎...")
