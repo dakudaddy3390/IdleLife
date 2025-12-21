@@ -96,6 +96,11 @@ class GeneticSystem:
     @staticmethod
     def crossover(parent1_genome, parent2_genome):
         """基因重组：模拟减数分裂时的交叉互换"""
+        # 类型保护
+        if not isinstance(parent1_genome, dict):
+            parent1_genome = GeneticSystem.generate_random_genome()
+        if not isinstance(parent2_genome, dict):
+            parent2_genome = GeneticSystem.generate_random_genome()
         child_genome = {}
         
         for locus in GeneticSystem.GENE_LOCI:
@@ -113,6 +118,9 @@ class GeneticSystem:
     @staticmethod
     def mutate(genome, mutation_rate=0.05):
         """基因突变"""
+        # 类型保护：如果 genome 不是 dict，生成新的随机基因组
+        if not isinstance(genome, dict):
+            genome = GeneticSystem.generate_random_genome()
         mutated = genome.copy()
         mutations = []
         
@@ -131,6 +139,9 @@ class GeneticSystem:
     @staticmethod
     def express_phenotype(genome):
         """基因表型表达：计算实际属性加成"""
+        # 类型保护：如果 genome 不是 dict，生成新的随机基因组
+        if not isinstance(genome, dict):
+            genome = GeneticSystem.generate_random_genome()
         phenotype = {}
         for locus in GeneticSystem.GENE_LOCI:
             alleles = genome.get(locus, 'aa')
