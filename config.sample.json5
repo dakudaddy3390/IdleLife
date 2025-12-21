@@ -1,0 +1,41 @@
+{
+    "api_providers": [
+        {
+            "name": "DeepSeek Official",
+            "api_key": "YOUR_API_KEY_HERE",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-chat"
+        }
+    ],
+    "active_provider": 0,
+    "characters": [
+        {
+            "id": "chi",
+            "name": "chi酱",
+            "file": "characters/chi.json",
+            "description": "技术宅猫娘"
+        }
+    ],
+    "active_character": 0,
+    "worlds": [
+        {
+            "id": "eldoria",
+            "name": "艾尔德利亚大陆",
+            "file": "worlds/eldoria.json",
+            "description": "剑与魔法的传统异世界"
+        }
+    ],
+    "active_world": 0,
+    "game_settings": {
+        "game_speed": 1, // 游戏速度(秒)，每回合等待时间
+        "max_tokens": 1024, // AI回复最大长度
+        "temperature": 1, // AI创造性 (0.0-1.0)
+        "history_limit": 10, // 历史记录保留条数 (0为不限制)
+        "autosave_interval": 1, // 自动保存间隔(回合)
+        "ui_refresh_rate": 0.1, // UI刷新率
+        "api_retry_count": 3, // API报错重试次数
+        "api_retry_delay": 1, // 每次重试等待时间(秒)
+        "history_compress_threshold": 20, // 历史记录条数触发压缩的阈值
+        "history_retention_count": 10 // 压缩后保留的最近记录条数
+    }
+}
