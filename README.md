@@ -23,7 +23,7 @@
 ### 1. 安装依赖
 
 ```bash
-pip install requests rich pyjson5
+pip install requests rich json5
 ```
 
 ### 2. 配置 API
