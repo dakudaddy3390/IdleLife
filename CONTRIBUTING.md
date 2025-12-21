@@ -68,11 +68,14 @@ pip install requests rich pyjson5
 |-----------|------|
 | `core/` | 核心模块（配置、AI、工具） |
 | `models/` | 数据模型（角色、世界） |
-| `systems/` | 游戏系统（战斗、遗传等） |
+| `systems/` | 游戏系统（战斗、遗传、骰子等） |
 | `characters/` | 角色配置文件 |
 | `worlds/` | 世界观配置文件 |
+| `saves/` | 存档目录（自动生成） |
+| `tests/` | 测试目录 |
 | `game.py` | 游戏入口 |
 | `game_engine.py` | 游戏主循环 |
+| `simulation.py` | 模拟运行模块 |
 
 ## 🎯 待办功能
 
