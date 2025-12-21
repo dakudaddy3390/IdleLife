@@ -88,3 +88,24 @@ class Config:
             print_info(f"🌍 世界: {world.get('name', '未知')}")
             return world.get('file', 'worlds/eldoria.json')
         return 'worlds/eldoria.json'
+    
+    @property
+    def api_providers(self):
+        """获取所有可用的 API 渠道列表"""
+        return self.data.get('api_providers', [])
+    
+    @property
+    def active_provider_idx(self):
+        """获取当前激活的 API 渠道索引"""
+        return self.data.get('active_provider', 0)
+    
+    def set_active_provider(self, idx):
+        """切换当前激活的 API 渠道"""
+        providers = self.api_providers
+        if 0 <= idx < len(providers):
+            self.data['active_provider'] = idx
+            self.provider = providers[idx]
+            print_info(f"🔄 已切换到 API 渠道: {self.provider.get('name', '未命名')}")
+            return True
+        return False
+

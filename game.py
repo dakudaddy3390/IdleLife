@@ -107,6 +107,7 @@ def show_save_menu():
         console.print()
     
     console.print(f"  [yellow]0.[/yellow] [新建] 新建存档")
+    console.print(f"  [cyan]S.[/cyan] [设置] 切换 API 渠道")
     console.print(f"  [red]Q.[/red] [退出] 退出游戏\n")
     
     return saves
@@ -158,6 +159,65 @@ def create_new_save(config):
     
     return True
 
+def show_settings_menu(config):
+    """显示设置菜单：选择 API 渠道"""
+    while True:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        console.print("\n[bold cyan]=========== [设置] API 渠道选择 ===========[/bold cyan]\n")
+        
+        providers = config.api_providers
+        current_idx = config.active_provider_idx
+        
+        if not providers:
+            console.print("[red]❗ 没有配置任何 API 渠道，请检查 config.json5[/red]")
+            console.input("\n按回车返回...")
+            return
+        
+        # 显示渠道列表
+        table = Table(title="[可用渠道]", box=box.SIMPLE, show_header=True, header_style="bold cyan")
+        table.add_column("序号", style="green", justify="right", width=4)
+        table.add_column("状态", style="yellow", width=6)
+        table.add_column("渠道名称", style="bold white")
+        table.add_column("模型", style="dim")
+        table.add_column("Base URL", style="dim", max_width=40)
+        
+        for i, p in enumerate(providers):
+            status = "[✔ 当前]" if i == current_idx else ""
+            name = p.get('name', '未命名')
+            model = p.get('model', '-')
+            base_url = p.get('base_url', '-')
+            # 截断过长的 URL
+            if len(base_url) > 35:
+                base_url = base_url[:32] + "..."
+            
+            row_style = "bold green" if i == current_idx else None
+            table.add_row(str(i + 1), status, name, model, base_url, style=row_style)
+        
+        console.print(table)
+        console.print(f"\n  [dim]当前使用: {config.provider_name}[/dim]")
+        console.print(f"\n  [red]0.[/red] 返回主菜单\n")
+        
+        choice = console.input("请选择渠道 (输入数字): ").strip().lower()
+        
+        if choice in ['0', 'q', '']:
+            return
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(providers):
+                if idx == current_idx:
+                    console.print(f"[yellow]‼️ 已经是当前渠道[/yellow]")
+                else:
+                    config.set_active_provider(idx)
+                    console.print(f"[green]✅ 已切换到: {providers[idx].get('name', '未命名')}[/green]")
+                time.sleep(1)
+            else:
+                console.print("[red]无效选择[/red]")
+                time.sleep(0.5)
+        except ValueError:
+            console.print("[red]请输入有效的数字[/red]")
+            time.sleep(0.5)
+
 def main():
     """主入口"""
     try:
@@ -184,6 +244,10 @@ def main():
         if choice == 'q':
             console.print("\n[yellow]👋 再见！[/yellow]\n")
             return
+        
+        if choice == 's':
+            show_settings_menu(config)
+            continue
         
         try:
             idx = int(choice)
