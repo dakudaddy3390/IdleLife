@@ -24,11 +24,28 @@ class GameEngine:
     def __init__(self, config=None, reset_save=False, save_file=None):
         self.config = config if config else Config()
         
-        # 根据存档自动切换世界
+        # 根据存档自动切换世界和角色
         if save_file and not reset_save:
             try:
+                # 1. 尝试从文件名推断角色 ID (save_{char_id}_{timestamp}.json)
+                import os
+                filename = os.path.basename(save_file)
+                if filename.startswith('save_') and filename.endswith('.json'):
+                    parts = filename.split('_')
+                    if len(parts) >= 2:
+                        char_id_from_file = parts[1] # 假设格式 consistent
+                        
+                        # 在配置中查找对应的角色索引
+                        for i, char_conf in enumerate(self.config.characters):
+                            if char_conf.get('id') == char_id_from_file:
+                                self.config.active_char_idx = i
+                                # print_info(f"👤 根据存档自动切换角色至: {char_conf.get('name')}")
+                                break
+
                 with open(save_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                
+                # 2. 切换世界
                 world_id = data.get('world_id')
                 if world_id:
                     # 查找对应的世界索引
@@ -38,11 +55,16 @@ class GameEngine:
                             print_info(f"🌍 根据存档自动切换世界至: {w['name']}")
                             break
             except Exception as e:
-                print_warning(f"读取存档世界信息失败: {e}")
+                print_warning(f"读取存档信息失败: {e}")
 
         self.ai = AIBrain(self.config)
         self.world = GameWorld(self.config)
         self.player = Character(self.config, reset_save=reset_save, save_file=save_file)
+        
+        # 如果是新档，尝试使用AI丰富设定
+        if reset_save:
+            self.ai_enrich_character_creation()
+            
         self.paused = False
         self.game_over = False
         
@@ -177,6 +199,67 @@ class GameEngine:
         self.game_over = True
         return False # 游戏结束
 
+    def ai_enrich_character_creation(self):
+        """使用AI在开局时进行创造性的种族和背景设定"""
+        print_info("🧠 AI 正在基于人设进行转生判定 (赋予合适的种族和起源)...")
+        
+        p = self.player
+        profile = p.profile
+        world_name = self.world.data.get('世界名称', '异世界')
+        world_desc = self.world.data.get('世界背景', '充满未知的冒险之地')
+        
+        # 获取可用种族列表
+        available_races = list(RaceSystem.RACES.keys())
+        
+        prompt = f"""
+【角色转生设定生成】
+角色名称：{p.name}
+原始人设：{json.dumps(profile.get('角色描述', ''), ensure_ascii=False)}
+转生世界：{world_name} ({world_desc})
+可用种族池：{', '.join(available_races)}
+
+【任务】
+请根据角色的性格、描述和语言风格，判断该角色转生到这个世界后，最适合成为哪个种族（必须从可用种族池中选择一个，如果原人设是普通人通常选人类，如果有特殊XP如猫娘可选兽人）。
+并生成一段简短的“转生背景故事”（50字以内）。
+
+【输出格式】
+严格JSON格式：
+{{
+    "race": "人类",
+    "reason": "选择理由",
+    "backstory": "转生后的简短背景描述"
+}}
+"""
+        try:
+            content, usage = self.ai.think_and_act(prompt)
+            if content:
+                import re
+                match = re.search(r'\{.*\}', content.replace('\n', ' '), re.DOTALL)
+                if match:
+                    res = json.loads(match.group())
+                    new_race = res.get('race')
+                    backstory = res.get('backstory')
+                    
+                    if new_race in RaceSystem.RACES:
+                        # 1. 更新种族
+                        old_race = p.save_data.get('race')
+                        if new_race != old_race:
+                            p.save_data['race'] = new_race
+                            # 重新计算寿命
+                            p.save_data['max_age'] = RaceSystem.calculate_max_age(new_race, 1)
+                            print_success(f"🧬 [AI判定] 种族变更为: {new_race} ({res.get('reason')})")
+                            p.save() # 保存变更
+                    
+                    # 2. 记录背景故事
+                    if backstory:
+                        p.add_event_to_history("转生", f"来到{world_name}: {backstory}", "冒险开始")
+                        print_info(f"📜 [起源] {backstory}")
+                        
+            self.process_ai_response(None, usage)
+            
+        except Exception as e:
+            print_warning(f"AI 设定生成失败，保持默认: {e}")
+
     def construct_prompt(self, event_type, event_data, extra_context=""):
         p = self.player
         stats = p.game_stats
@@ -234,6 +317,21 @@ class GameEngine:
         elif isinstance(lang, str):
             lang_summary = lang[:50]
         
+        # 注入家庭信息
+        family_info = ""
+        current_char = p.save_data.get('family_tree', {}).get('members', {}).get(p.save_data.get('current_character_id'), {})
+        spouse = current_char.get('spouse_name')
+        children = p.get_children()
+        
+        if spouse:
+            family_info += f"配偶: {spouse} "
+        if children:
+            child_names = [c[1]['name'] for c in children]
+            family_info += f"孩子: {', '.join(child_names)} "
+            
+        if family_info:
+            extra_context += f" [家庭关系: {family_info}]"
+        
         prompt = f"""【角色扮演指令】
 你现在必须完全扮演角色：{p.name}
 
@@ -242,7 +340,7 @@ class GameEngine:
 
 【性格特点】{psych_summary if psych_summary else '无特殊设定'}
 【说话风格】{lang_summary if lang_summary else '正常说话'}
-【当前状态】Lv{stats['等级']} {p.save_data.get('race', '人类')} | HP:{stats['HP']}/{stats['MaxHP']} | {san_status}
+【当前状态】Lv{stats['等级']} {p.save_data.get('race', '人类')} | HP:{int(stats['HP'])}/{int(stats['MaxHP'])} | {san_status}
 【特质】{','.join(p.get_traits()) if p.get_traits() else '无'}
 
 【当前事件】
@@ -456,11 +554,13 @@ class GameEngine:
                          spouse_npc['名称'] = name
                 
                 spouse_name = spouse_npc.get('名称', '神秘伴侣') if spouse_npc else "神秘伴侣"
+                spouse_personality = spouse_npc.get('性格', '温柔') if spouse_npc else "温柔"
                 spouse_id = str(uuid.uuid4())[:8]
                 member['spouse_id'] = spouse_id
                 member['spouse_name'] = spouse_name # 记录名字方便后续可以重构NPC对象
+                member['spouse_personality'] = spouse_personality
                 
-                print_success(f"💍 喜结良缘！你与 {spouse_name} 结婚了。")
+                print_success(f"💍 喜结良缘！你与 {spouse_name} ({spouse_personality}) 结婚了。")
                 p.add_event_to_history("结婚", f"与 {spouse_name} 结婚", "家族诞生")
 
         # 2. 婚后生活 (已婚) - 替代原本简单的生子判定
@@ -468,11 +568,24 @@ class GameEngine:
         if spouse_id:
             # 随机构造一个伴侣对象用于互动
             spouse_name = member.get('spouse_name', '配偶')
+            spouse_personality = member.get('spouse_personality', '温柔')
             spouse_npc = {
                 "名称": spouse_name,
                 "类型": "伴侣",
-                "id": spouse_id
+                "id": spouse_id,
+                "性格": spouse_personality
             }
+            
+            # 增加日常互动提示 (10%概率)，提醒玩家配偶的存在
+            if random.random() < 0.1:
+                interactions = [
+                    f"{spouse_name} 微笑着为你准备了早餐。",
+                    f"看着 {spouse_name} 的睡脸，你感到一阵安心。",
+                    f"{spouse_name} 叮嘱你在外冒险要小心。",
+                    f"你和 {spouse_name} 一起散了会儿步。",
+                    f"{spouse_name} ({spouse_personality}) 正在思考今晚吃什么。"
+                ]
+                print_info(f"💕 [生活] {random.choice(interactions)}")
             
             # 尝试亲密
             # 夫妻默认好感度高 -> 概率 DO
@@ -617,6 +730,103 @@ class GameEngine:
         else:
             print_success(f"🛡️ [AI决定] 你拒绝了诱惑，守住了底线。")
 
+    def show_full_status(self):
+        """显示角色完整状态 (C键触发)"""
+        p = self.player
+        from rich.table import Table
+        from rich.columns import Columns
+        from collections import Counter
+        
+        console.clear()
+        print_header(f"📊 {p.name} 的详细档案")
+        
+        # 1. 基础属性表
+        stats_table = Table(title="基础属性", show_header=True, header_style="bold magenta", expand=True)
+        stats_table.add_column("属性", style="cyan", justify="right")
+        stats_table.add_column("数值", style="green", justify="left")
+        stats_table.add_column("属性", style="cyan", justify="right")
+        stats_table.add_column("数值", style="green", justify="left")
+        
+        s = p.game_stats
+        rows = [
+            ("等级", f"{s.get('等级', 1)}", "经验", f"{s.get('经验', 0)}/{s.get('下一级经验', 100)}"),
+            ("HP", f"{int(s.get('HP', 0))}/{int(s.get('MaxHP', 0))}", "MP", f"{int(s.get('MP', 0))}/{int(s.get('MaxMP', 0))}"),
+            ("攻击", f"{int(s.get('攻击', 0))}", "防御", f"{int(s.get('防御', 0))}"),
+            ("STR", f"{int(s.get('STR', 0))}", "AGI", f"{int(s.get('AGI', 0))}"),
+            ("INT", f"{int(s.get('INT', 0))}", "CON", f"{int(s.get('CON', 0))}"),
+            ("CHA", f"{int(s.get('CHA', 0))}", "LUK", f"{int(s.get('LUK', 0))}"),
+            ("SAN", f"{int(s.get('SAN', 0))}/{s.get('MaxSAN', 99)}", "金币", f"{s.get('金币', 0)}"),
+        ]
+        for row in rows:
+            stats_table.add_row(*row)
+            
+        # 2. 家族信息
+        family = p.save_data.get('family_tree', {})
+        members = family.get('members', {})
+        current_char = members.get(p.save_data.get('current_character_id'), {})
+        
+        spouse_name = current_char.get('spouse_name', '无')
+        children = p.get_children()
+        children_txt = "无"
+        if children:
+            names = [f"{c[1].get('name')}" for c in children]
+            children_txt = ", ".join(names)
+        
+        fam_table = Table(title="👨‍👩‍👧‍👦 家族信息", show_header=False, box=None, expand=True)
+        fam_table.add_column("Key", style="yellow", justify="right")
+        fam_table.add_column("Value", style="white", justify="left")
+        fam_table.add_row("世代", f"第 {current_char.get('generation', 1)} 代")
+        fam_table.add_row("配偶", spouse_name)
+        fam_table.add_row("家族声望", str(family.get('family_prestige', 0)))
+        fam_table.add_row("子嗣", children_txt)
+
+        fam_panel = Panel(fam_table, border_style="yellow")
+        
+        # 3. 物品栏
+        items = p.inventory
+        inv_text = ""
+        if not items:
+            inv_text = "背包空空如也"
+        else:
+            # 统计同类物品
+            item_names = [i.get('name', '未知') for i in items]
+            counts = Counter(item_names)
+            
+            # 使用多列显示物品 (每行4个)
+            inv_grid = Table(show_header=False, box=None, expand=True)
+            inv_grid.add_column("Item1", ratio=1)
+            inv_grid.add_column("Item2", ratio=1)
+            inv_grid.add_column("Item3", ratio=1)
+            inv_grid.add_column("Item4", ratio=1)
+            
+            current_row = []
+            for name, count in counts.most_common(40): # 显示最多40种
+                current_row.append(f"📦 {name} x{count}")
+                if len(current_row) == 4:
+                    inv_grid.add_row(*current_row)
+                    current_row = []
+            if current_row:
+                 # 补齐空位
+                 while len(current_row) < 4: current_row.append("")
+                 inv_grid.add_row(*current_row)
+                 
+            inv_panel = Panel(inv_grid, title=f"🎒 背包 ({len(items)}件)", border_style="blue")
+        
+        # 组合显示
+        console.print(stats_table)
+        console.print(fam_panel)
+        if items:
+            console.print(inv_panel)
+        else:
+            console.print(Panel("背包空空如也", title="🎒 背包", border_style="blue"))
+        
+        # 等待确认
+        console.input("\n[bold green]按回车键继续...[/bold green]")
+            
+        console.clear()
+        print_header("✨ 游戏继续 ✨")
+        print_info(f"当前角色: {self.player.name} | 'F'暂停 | 'C'状态 | 'S'摘要 | 'Q'退出")
+
     def run_turn(self):
         self.session_stats['回合数'] += 1
         current_region_id = self.player.current_location
@@ -710,7 +920,8 @@ class GameEngine:
             
             # 预先进行幸运判定，给 AI 参考，但最终由 AI 制定的结果为准
             luck_val = self.player.game_stats.get('幸运', 50)
-            luck_roll, level, success = DiceSystem.check("探索运势", luck_val)
+            # 静默检定，避免“虚空判定”，结果稍后整合进文案
+            luck_roll, level, success = DiceSystem.check("探索运势", luck_val, silent=True)
             luck_context = f"运势：{level} ({luck_roll})"
 
             explore_json = None
@@ -790,11 +1001,11 @@ class GameEngine:
             if not found_item and random.random() < 0.2:
                 gold = random.randint(1, 10)
             
-            # 大成功奖励翻倍
-            if is_critical:
+            # 大成功/卓越成功奖励翻倍
+            if is_critical or level in ['critical', 'hard']:
                 exp *= 5
-                gold = max(5, gold * 5) # 确保大成功至少有5金币(即使原本是0)
-                print_success("✨ 吉星高照！大成功获得 5倍 奖励！")
+                gold = max(10, gold * 5) # 确保大成功至少有10金币
+                print_success(f"✨ 吉星高照！(运势:{level}) 大成功获得 5倍 奖励！")
 
             self.player.gain_exp(exp)
             self.player.game_stats['金币'] += gold
@@ -817,8 +1028,9 @@ class GameEngine:
             self.session_stats['休息次数'] += 1
             heal_hp = int(self.player.game_stats['MaxHP'] * 0.2)
             heal_mp = int(self.player.game_stats['MaxMP'] * 0.2)
-            self.player.heal(heal_hp, heal_mp)
-            print_event("休息", f"你找了个安全的地方休息，恢复了 {heal_hp} HP。")
+            heal_san = 5
+            self.player.heal(heal_hp, heal_mp, heal_san)
+            print_event("休息", f"你找了个安全的地方休息，恢复了 {heal_hp} HP、{heal_mp} MP，理智稍微回复了。")
             ai_input_data = "休息调整状态。"
 
         elif event_type == "NPC":
@@ -939,7 +1151,19 @@ class GameEngine:
                  for h in to_summarize:
                      text += f"{h['描述']}; "
                      
-                 prompt = f"用30字概括以下经历：{text[:500]}"
+                 # 注入家庭简报，防止AI遗忘重要人名
+                 family_info = ""
+                 current_char = self.player.save_data.get('family_tree', {}).get('members', {}).get(self.player.save_data.get('current_character_id'), {})
+                 spouse = current_char.get('spouse_name')
+                 children = self.player.get_children()
+                 if spouse: family_info += f"配偶:{spouse} "
+                 if children: 
+                     names = [c[1]['name'] for c in children]
+                     family_info += f"子女:{','.join(names)}"
+                 
+                 context_prompt = f" [已知关系: {family_info}]" if family_info else ""
+                 
+                 prompt = f"用30字概括以下经历(注意保留重要人名{context_prompt})：{text[:500]}"
                  summary, _ = self.ai.think_and_act(prompt)
                  
                  if summary:
@@ -955,7 +1179,7 @@ class GameEngine:
 
     def main_loop(self):
         print_header("✨ 游戏开始 ✨")
-        print_info(f"当前角色: {self.player.name} | 'F'暂停 | 'S'查看摘要 | 'Q'退出")
+        print_info(f"当前角色: {self.player.name} | 'F'暂停 | 'C'状态 | 'S'摘要 | 'Q'退出")
         
         last_time = 0
         
@@ -968,6 +1192,8 @@ class GameEngine:
                         self.paused = not self.paused
                         status = "暂停" if self.paused else "继续"
                         print_warning(f"\n⏸️  游戏{status}")
+                    elif key.lower() == b'c':
+                         self.show_full_status()
                     elif key.lower() == b'q':
                         print_warning("\n💾 正在保存并退出...")
                         self.player.save()
@@ -990,7 +1216,7 @@ class GameEngine:
                         console.clear()
                         # 重绘界面提示
                         print_header("✨ 游戏继续 ✨")
-                        print_info(f"当前角色: {self.player.name} | 'F'暂停 | 'S'查看摘要 | 'Q'退出")
+                        print_info(f"当前角色: {self.player.name} | 'F'暂停 | 'C'状态 | 'S'摘要 | 'Q'退出")
 
                 if not self.paused:
                     current_time = time.time()
@@ -1045,8 +1271,8 @@ class GameEngine:
         # 治疗
         if '治疗' in effect:
             if effect['治疗'] == '全满':
-                p.heal(p.game_stats['MaxHP'], p.game_stats['MaxMP'])
-                print_success("💖 状态完全恢复！")
+                p.heal(p.game_stats['MaxHP'], p.game_stats['MaxMP'], 99)
+                print_success("💖 状态完全恢复 (HP/MP/SAN)！")
             elif isinstance(effect['治疗'], int):
                 p.heal(effect['治疗'])
                 print_success(f"💚 恢复了 {effect['治疗']} 点生命")

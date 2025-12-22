@@ -76,11 +76,12 @@ class DiceSystem:
         return pattern.sub(replace_func, text)
 
     @staticmethod
-    def check(check_name, target_value):
+    def check(check_name, target_value, silent=False):
         """
         进行一次 D100 检定 (通用 RPG 风格)
         :param check_name: 检定名称 (如 "敏捷", "幸运")
         :param target_value: 目标值 (属性值/技能值)
+        :param silent: 是否静默 (不打印日志)
         :return: (roll_value, result_string, is_success)
         """
         roll_val = random.randint(1, 100)
@@ -114,6 +115,7 @@ class DiceSystem:
             is_success = False
             level = "failure"
             
-        print_info(f"🎲 {check_name}检定({target_value}): [cyan]{roll_val}[/cyan] -> {result_str}")
+        if not silent:
+            print_info(f"🎲 {check_name}检定({int(target_value)}): [cyan]{roll_val}[/cyan] -> {result_str}")
         DiceSystem.last_result = level
         return roll_val, level, is_success

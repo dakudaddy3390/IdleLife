@@ -52,8 +52,10 @@ def show_save_menu():
     root_saves = glob.glob('save_*.json')
     saves.extend(root_saves)
     
-    # 去重 (以防万一)
-    saves = sorted(list(set(saves)), reverse=True) # 按时间倒序(文件名通常含时间戳)
+    # 去重
+    saves = list(set(saves))
+    # 按修改时间倒序排序 (确保最新的在最前)
+    saves.sort(key=os.path.getmtime, reverse=True)
 
     if saves:
         table = Table(title="[存档列表]", box=box.SIMPLE, show_header=True, header_style="bold cyan")

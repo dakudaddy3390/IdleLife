@@ -40,7 +40,23 @@ class RaceSystem:
                         return r
 
         # 2. 关键词推断
-        desc = str(profile_data).lower()
+        # 只在描述性文本中查找，避免匹配到示例对话中的关键词(如"摸摸小猫娘")
+        search_text = ""
+        
+        if isinstance(profile_data, dict):
+            # 拼接主要描述字段
+            search_text += str(profile_data.get('角色描述', ''))
+            search_text += str(profile_data.get('基本信息', {}))
+            # 自我认知通常包含种族认同
+            search_text += str(profile_data.get('心理特征', {}).get('自我认知', {})) 
+            
+            # 如果没提取到多少文本(可能是旧格式)，则回退到整体转字符串，但尽量避开示例
+            if len(search_text) < 10:
+                 search_text = str(profile_data)
+        else:
+            search_text = str(profile_data)
+            
+        desc = search_text.lower()
         if "机械" in desc or "义体" in desc or "改造" in desc:
             return "改造人"
         if "仿生人" in desc or "机器人" in desc or "android" in desc:

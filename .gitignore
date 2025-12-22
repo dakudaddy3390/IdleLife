@@ -56,6 +56,8 @@ ENV/
 .DS_Store
 Thumbs.db
 
+
 # ==================== 其他 ====================
 *.orig
 .cache/
+characters/wuming.json

@@ -392,7 +392,8 @@ class Character:
             self.save_data['event_history'] = self.save_data['event_history'][-keep_count:]
         
         self.save()
-        print_success("📜 记忆已从繁杂的细节中提炼为宝贵的经验。")
+        print_success(f"📜 记忆已提炼: {summary}")
+        # print_success("📜 记忆已从繁杂的细节中提炼为宝贵的经验。")
 
     @property
     def name(self): return self.profile['角色名称']
@@ -661,9 +662,12 @@ class Character:
         self.save()
         return True
 
-    def heal(self, hp=0, mp=0):
+    def heal(self, hp=0, mp=0, san=0):
         self.game_stats['HP'] = min(self.game_stats['MaxHP'], self.game_stats['HP'] + hp)
         self.game_stats['MP'] = min(self.game_stats['MaxMP'], self.game_stats['MP'] + mp)
+        if san > 0:
+            max_san = self.game_stats.get('MaxSAN', 99)
+            self.game_stats['SAN'] = min(max_san, self.game_stats.get('SAN', 0) + san)
 
     def take_damage(self, dmg):
         self.game_stats['HP'] = max(0, self.game_stats['HP'] - dmg)
